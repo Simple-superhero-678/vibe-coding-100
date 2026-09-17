@@ -1,0 +1,22 @@
+# 环境变量文件（本地私有，绝不入库）
+.env
+.env.local
+.env.*.local
+
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+
+# 日志
+*.log
+npm-debug.log*
+
+# 编辑器 / 系统生成
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# WorkBuddy 本地工作数据（含每日工作日志，属工具数据不入库）
+.workbuddy/
