@@ -20,3 +20,7 @@ Thumbs.db
 
 # WorkBuddy 本地工作数据（含每日工作日志，属工具数据不入库）
 .workbuddy/
+
+# 打卡上传中间产物（含 ima COS 临时凭证 JSON，绝不入库）
+checkin/_build/
+*.genie
