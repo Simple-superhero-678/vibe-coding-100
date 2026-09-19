@@ -1,0 +1,35 @@
+/* 异兽志 · 设计令牌 v1
+   建立：2026-09-18 ｜ 依据：知识库《00-审美总纲》12 关键词
+   规矩：三色上限（宣纸 / 墨 / 朱砂）。想加第四种颜色，先推翻这一页。 */
+
+:root{
+  /* —— 彩 —— */
+  --paper:      #F4EFE4;  /* 宣纸：卡片底 */
+  --paper-deep: #E9E2D4;  /* 宣纸暗部：页底 / 面板 */
+  --ink:        #1F1B18;  /* 墨：正文 */
+  --ink-2:      #6B6157;  /* 淡墨：次级文字 */
+  --cinnabar:   #A3302A;  /* 朱砂：全站唯一强调色 */
+  --hairline:   rgba(31,27,24,.14);
+
+  /* —— 字 —— */
+  --serif: "Source Han Serif SC","Noto Serif SC","Songti SC","STSong",SimSun,"宋体",serif;
+  --sans:  "PingFang SC","Microsoft YaHei","微软雅黑",system-ui,sans-serif;
+  --track-wide:.22em;   /* 标题字距 */
+  --track-mid: .12em;   /* 小字字距 */
+
+  /* —— 版式 —— */
+  --measure: 720px;     /* 正文栏最大宽 */
+  --shell:   1080px;    /* 页面容器最大宽 */
+  --gap:     32px;      /* 卡片间距下限 */
+  --pad-x:   44px;
+  --breath:  11vh;      /* 首屏上下留白 */
+
+  /* —— 纸纹：CSS 生成，全站不引图片 —— */
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.12 0 0 0 0 0.10 0 0 0 0 0.08 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* —— 动效：全站只有一条朱砂线在动 —— */
+  --ease: cubic-bezier(.4,0,.2,1);
+  --dur:  .6s;
+}
+
+/* 禁止清单（照抄在墙上）：渐变 / 霓虹 / 阴影堆叠 / emoji 图标 / 第二种红 */

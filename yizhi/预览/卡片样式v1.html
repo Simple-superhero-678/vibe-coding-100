@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>异兽志 · 卡片样式 v1</title>
+<style>
+  :root{
+    --paper:      #F4EFE4;  /* 宣纸（卡片） */
+    --paper-deep: #E9E2D4;  /* 宣纸暗部（页底/面板） */
+    --ink:        #1F1B18;  /* 墨 */
+    --ink-2:      #6B6157;  /* 淡墨 */
+    --cinnabar:   #A3302A;  /* 朱砂（唯一强调色） */
+    --hairline:   rgba(31,27,24,.14);
+    --serif: "Source Han Serif SC","Noto Serif SC","Songti SC","STSong",SimSun,"宋体",serif;
+    --sans: "PingFang SC","Microsoft YaHei","微软雅黑",system-ui,sans-serif;
+    /* 纸张纤维噪点：纯 CSS 内联，不引图片 */
+    --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.12 0 0 0 0 0.10 0 0 0 0 0.08 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background-color:var(--paper-deep);
+    background-image:var(--noise);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.9;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:11vh 44px 16vh}
+
+  /* ---------- 页头：竖排标题 ---------- */
+  .hero{display:flex;justify-content:flex-end;align-items:flex-start;gap:48px;margin-bottom:15vh}
+  .hero h1{
+    writing-mode:vertical-rl;
+    font-family:var(--serif);font-weight:400;
+    font-size:62px;letter-spacing:.28em;margin:0;line-height:1;
+  }
+  .hero .meta{
+    margin-top:6px;max-width:360px;
+    font-size:13px;color:var(--ink-2);letter-spacing:.08em;line-height:2.1;
+  }
+  .hero .meta b{font-weight:400;color:var(--cinnabar)}
+
+  /* ---------- 区块标题 ---------- */
+  section{margin-bottom:12vh}
+  .label{
+    display:flex;align-items:center;gap:12px;
+    font-size:12.5px;color:var(--ink-2);letter-spacing:.22em;margin-bottom:34px;
+  }
+  .label::before{content:"";width:2px;height:15px;background:var(--cinnabar)}
+  .note{font-size:12.5px;color:var(--ink-2);letter-spacing:.04em;margin-top:26px;line-height:2.1}
+
+  /* ---------- 色板 ---------- */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px}
+  .sw{border:1px solid var(--hairline);background:var(--paper);padding:0;overflow:hidden}
+  .sw .chip{height:78px}
+  .sw .info{padding:12px 14px;font-size:12px;letter-spacing:.06em;color:var(--ink-2);line-height:1.9}
+  .sw .info em{display:block;font-style:normal;color:var(--ink);font-family:var(--serif);font-size:14px;letter-spacing:.1em}
+
+  /* ---------- 卡片通用 ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:34px}
+  .card{
+    position:relative;background-color:var(--paper);background-image:var(--noise);
+    border:1px solid var(--hairline);
+    padding:36px 32px 32px;
+    display:flex;flex-direction:column;
+    transition:border-color .55s ease;
+  }
+  .card::after{
+    content:"";position:absolute;left:32px;bottom:0;height:2px;width:0;
+    background:var(--cinnabar);transition:width .6s cubic-bezier(.4,0,.2,1);
+  }
+  .card:hover{border-color:rgba(163,48,42,.42)}
+  .card:hover::after{width:calc(100% - 64px)}
+
+  /* 印章 */
+  .seal{
+    position:absolute;top:20px;left:20px;
+    width:34px;height:34px;display:grid;place-items:center;
+    background:var(--cinnabar);color:var(--paper);
+    font-family:var(--serif);font-size:19px;line-height:1;border-radius:2px;
+  }
+  .seal.soft{background:transparent;color:var(--cinnabar);box-shadow:inset 0 0 0 1px var(--cinnabar)}
+
+  /* 竖排名 */
+  .vname{
+    writing-mode:vertical-rl;font-family:var(--serif);font-weight:400;
+    font-size:29px;letter-spacing:.24em;line-height:1;
+  }
+  .vname small{font-size:12px;letter-spacing:.14em;color:var(--ink-2);margin-top:10px}
+
+  .silhouette{margin:0;display:block}
+  .silhouette svg{display:block;width:100%;height:auto}
+  .silhouette svg *{stroke:var(--ink);fill:none;stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;opacity:.82}
+
+  .origin{
+    font-family:var(--serif);font-size:14.5px;color:var(--ink-2);
+    line-height:2.15;letter-spacing:.06em;margin:0;
+  }
+  .omen{
+    font-size:12.5px;color:var(--cinnabar);letter-spacing:.12em;
+    margin:0;padding-left:12px;border-left:2px solid var(--cinnabar);
+  }
+
+  /* V1 印章式 */
+  .v1{min-height:430px;justify-content:space-between;gap:26px}
+  .v1 .top{display:flex;justify-content:flex-end}
+
+  /* V2 横排极简 */
+  .v2{min-height:430px;align-items:center;justify-content:space-between;gap:26px;text-align:center}
+  .v2 .hname{
+    font-family:var(--serif);font-size:32px;letter-spacing:.42em;
+    margin:0;padding:0 0 0 .42em;
+  }
+  .v2 .silhouette{width:100%;max-width:300px}
+  .v2 .rule{width:38px;height:1px;background:var(--cinnabar)}
+  .v2 .seal{top:auto;bottom:20px;right:20px;left:auto}
+
+  /* V3 图鉴小卡 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:18px}
+  .mini{
+    position:relative;aspect-ratio:3/4.15;
+    background-color:var(--paper);background-image:var(--noise);
+    border:1px solid var(--hairline);
+    padding:20px 18px;display:flex;flex-direction:column;justify-content:space-between;
+    transition:border-color .55s ease;
+  }
+  .mini:hover{border-color:rgba(163,48,42,.42)}
+  .mini .vname{font-size:20px;letter-spacing:.2em;align-self:flex-end}
+  .mini .dot{width:7px;height:7px;background:var(--cinnabar)}
+  .mini .dot.good{background:transparent;box-shadow:inset 0 0 0 1px var(--cinnabar)}
+  .mini .en{font-size:11.5px;color:var(--ink-2);letter-spacing:.1em}
+
+  /* 筛选条 */
+  .filters{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:30px;font-size:13px;letter-spacing:.14em}
+  .chip{
+    position:relative;color:var(--ink-2);cursor:default;padding-bottom:6px;
+  }
+  .chip.on{color:var(--ink)}
+  .chip.on::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--cinnabar)}
+
+  /* ---------- 境界轴 ---------- */
+  .axis{display:flex;gap:70px;flex-wrap:wrap}
+  .rail{position:relative;padding-left:34px}
+  .rail::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:1px;background:var(--hairline)}
+  .step{position:relative;margin-bottom:26px}
+  .step::before{
+    content:"";position:absolute;left:-33px;top:12px;
+    width:7px;height:7px;background:var(--cinnabar);
+  }
+  .step .j{font-family:var(--serif);font-size:21px;letter-spacing:.2em}
+  .step .d{font-size:12.5px;color:var(--ink-2);letter-spacing:.06em}
+  .rail-title{
+    font-family:var(--serif);font-size:15px;letter-spacing:.2em;
+    color:var(--ink-2);margin:0 0 24px;padding-left:2px;
+  }
+  .rail-title em{font-style:normal;color:var(--cinnabar)}
+
+  /* ---------- 详情态 ---------- */
+  .detail{
+    background-color:var(--paper);background-image:var(--noise);
+    border:1px solid var(--hairline);padding:44px 46px;
+    display:grid;grid-template-columns:230px 1fr;gap:46px;
+  }
+  .detail .k{font-size:12.5px;color:var(--ink-2);letter-spacing:.18em;margin-bottom:8px}
+  .detail .v{font-family:var(--serif);font-size:14.5px;letter-spacing:.06em;margin-bottom:26px;line-height:2.1}
+  .detail .v.use{border-left:2px solid var(--cinnabar);padding-left:14px;color:var(--cinnabar)}
+
+  footer{border-top:1px solid var(--hairline);padding-top:26px;font-size:12.5px;color:var(--ink-2);letter-spacing:.06em;line-height:2.1}
+
+  @media(max-width:720px){
+    .wrap{padding:8vh 22px 12vh}
+    .hero{gap:26px;margin-bottom:10vh}
+    .hero h1{font-size:44px}
+    .detail{grid-template-columns:1fr;gap:26px;padding:32px 26px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ 页头 ============ -->
+  <header class="hero">
+    <div class="meta">
+      <b>卡片样式 v1</b> · 2026-09-18<br>
+      宣纸米白 × 墨 × 朱砂，三色上限<br>
+      三式卡片 + 图鉴网格 + 境界轴 + 详情态<br>
+      <span style="opacity:.75">剪影为占位线稿，正式版自绘</span>
+    </div>
+    <h1>异兽志</h1>
+  </header>
+
+  <!-- ============ 一、色板 ============ -->
+  <section>
+    <div class="label">一 · 色板（只三色 + 两个灰度）</div>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#F4EFE4"></div><div class="info"><em>宣纸</em>#F4EFE4 · 卡片底</div></div>
+      <div class="sw"><div class="chip" style="background:#E9E2D4"></div><div class="info"><em>宣纸暗部</em>#E9E2D4 · 页底<br>面板</div></div>
+      <div class="sw"><div class="chip" style="background:#1F1B18"></div><div class="info"><em>墨</em>#1F1B18 · 正文</div></div>
+      <div class="sw"><div class="chip" style="background:#6B6157"></div><div class="info"><em>淡墨</em>#6B6157 · 次级</div></div>
+      <div class="sw"><div class="chip" style="background:#A3302A"></div><div class="info"><em>朱砂</em>#A3302A · 唯一强调</div></div>
+    </div>
+    <p class="note">
+      纸纹是 CSS 噪点，不是图片——所以整站到现在为止体积是 <b>0 张图</b>。<br>
+      三色之外的任何颜色都不许出现；这张纸上出现的红色，全站只有一种红。
+    </p>
+  </section>
+
+  <!-- ============ 二、卡片三式 ============ -->
+  <section>
+    <div class="label">二 · 卡片三式</div>
+    <div class="cards">
+
+      <!-- V1 印章式 -->
+      <article class="card v1">
+        <span class="seal">凶</span>
+        <div class="top"><div class="vname">蠃鱼<small>灾祸类</small></div></div>
+        <figure class="silhouette">
+          <svg viewBox="0 0 120 80" role="img" aria-label="蠃鱼剪影占位">
+            <path d="M30 44 C42 30 78 30 92 44 C78 58 42 58 30 44 Z"/>
+            <path d="M30 44 L10 34 L15 44 L10 54 Z"/>
+            <path d="M58 34 C62 15 84 9 100 15 C88 23 72 30 62 37"/>
+            <circle cx="84" cy="42" r="1.7"/>
+          </svg>
+        </figure>
+        <p class="origin">鱼身鸟翼，音如鸳鸯，见则其邑大水。</p>
+        <p class="omen">见则其邑大水</p>
+      </article>
+
+      <!-- V2 横排极简 -->
+      <article class="card v2">
+        <span class="seal soft">吉</span>
+        <p class="hname">鸾鸟</p>
+        <figure class="silhouette">
+          <svg viewBox="0 0 120 80" role="img" aria-label="鸾鸟剪影占位">
+            <path d="M42 48 C50 38 78 35 88 43 C80 56 52 58 42 48 Z"/>
+            <path d="M78 40 C86 30 88 22 84 14"/>
+            <circle cx="83" cy="12" r="4"/>
+            <path d="M79 12 L68 15"/>
+            <path d="M60 54 L58 72"/>
+            <path d="M51 72 L65 72"/>
+            <path d="M42 48 C31 46 22 50 17 57"/>
+            <path d="M52 43 C58 36 71 36 77 41"/>
+          </svg>
+        </figure>
+        <span class="rule"></span>
+        <p class="origin">如翟五彩，见则天下安宁。</p>
+      </article>
+
+      <!-- V3 竖排印章横排混排 -->
+      <article class="card v1">
+        <span class="seal">怪</span>
+        <div class="top"><div class="vname">帝江<small>无面目</small></div></div>
+        <figure class="silhouette">
+          <svg viewBox="0 0 120 80" role="img" aria-label="帝江剪影占位">
+            <path d="M32 30 C50 17 80 19 93 33 C97 47 76 62 52 60 C35 58 27 46 32 30 Z"/>
+            <path d="M58 20 C54 8 44 3 34 5"/>
+            <path d="M60 60 C58 72 50 77 41 75"/>
+            <path d="M40 58 L37 68"/><path d="M54 60 L53 71"/><path d="M68 58 L70 68"/>
+            <path d="M42 22 L38 12"/><path d="M70 22 L74 12"/>
+          </svg>
+        </figure>
+        <p class="origin">如黄囊，赤如丹火，六足四翼，浑敦无面目，识歌舞。</p>
+        <p class="omen">识歌舞 · 无面目</p>
+      </article>
+
+    </div>
+    <p class="note">
+      <b>V1 印章式</b>＝主卡，用于详情页与图鉴大卡；<b>V2 横排极简</b>＝首页三张推荐位；<b>V3</b>＝带副标的变体。<br>
+      全站唯一的动效：鼠标悬停时，底部一条朱砂细线从左往右长出来。没有阴影、没有上浮、没有缩放。
+    </p>
+  </section>
+
+  <!-- ============ 三、图鉴网格 ============ -->
+  <section>
+    <div class="label">三 · 图鉴网格态（列表页）</div>
+    <div class="filters">
+      <span class="chip on">全部</span>
+      <span class="chip">对人有益</span>
+      <span class="chip">象征吉祥</span>
+      <span class="chip on">凶恶食人</span>
+      <span class="chip">带来灾祸</span>
+      <span class="chip">山神 · 奇人</span>
+    </div>
+    <div class="grid">
+      <div class="mini">
+        <div class="en">山经 · 西</div>
+        <figure class="silhouette" style="margin:0">
+          <svg viewBox="0 0 120 80"><path d="M30 44 C42 32 76 32 90 44 C76 56 42 56 30 44 Z"/><path d="M67 32 C72 18 86 14 98 18"/></svg>
+        </figure>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+          <span class="dot"></span><div class="vname">穷奇</div>
+        </div>
+      </div>
+      <div class="mini">
+        <div class="en">山经 · 西</div>
+        <figure class="silhouette" style="margin:0">
+          <svg viewBox="0 0 120 80"><path d="M30 46 C40 36 68 34 80 42 C74 54 44 58 30 46 Z"/><path d="M60 40 C66 32 76 32 80 38"/><path d="M34 52 C24 48 16 40 15 30"/><path d="M30 48 C20 42 14 33 14 24"/></svg>
+        </figure>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+          <span class="dot good"></span><div class="vname">旋龟</div>
+        </div>
+      </div>
+      <div class="mini">
+        <div class="en">山经 · 西</div>
+        <figure class="silhouette" style="margin:0">
+          <svg viewBox="0 0 120 80"><path d="M48 42 C54 34 74 34 80 42 C74 52 54 52 48 42 Z"/><path d="M48 42 C42 38 34 38 30 42"/><path d="M80 42 C88 40 96 42 100 46"/></svg>
+        </figure>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+          <span class="dot"></span><div class="vname">天狗</div>
+        </div>
+      </div>
+      <div class="mini">
+        <div class="en">山经 · 东</div>
+        <figure class="silhouette" style="margin:0">
+          <svg viewBox="0 0 120 80"><path d="M32 44 C44 32 74 30 88 40 C80 54 46 58 32 44 Z"/><path d="M88 40 C94 36 100 36 104 40"/><path d="M32 44 C22 42 14 44 10 50"/><path d="M50 34 C54 24 64 22 70 26"/></svg>
+        </figure>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+          <span class="dot good"></span><div class="vname">狡</div>
+        </div>
+      </div>
+      <div class="mini">
+        <div class="en">山经 · 南</div>
+        <figure class="silhouette" style="margin:0">
+          <svg viewBox="0 0 120 80"><path d="M34 46 C44 34 72 32 84 42 C76 54 48 58 34 46 Z"/><path d="M84 42 C90 38 98 38 102 42"/><path d="M34 46 L18 38 L22 48 L16 56 Z"/></svg>
+        </figure>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+          <span class="dot good"></span><div class="vname">鹿蜀</div>
+        </div>
+      </div>
+      <div class="mini">
+        <div class="en">山经 · 中</div>
+        <figure class="silhouette" style="margin:0">
+          <svg viewBox="0 0 120 80"><path d="M30 40 C44 28 76 28 90 40 C78 54 42 54 30 40 Z"/><path d="M60 30 C62 20 72 16 82 18"/><path d="M60 50 C58 60 48 64 38 62"/></svg>
+        </figure>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+          <span class="dot"></span><div class="vname">毕方</div>
+        </div>
+      </div>
+    </div>
+    <p class="note">
+      实心朱砂点＝凶，空心朱砂点＝吉。<b>不用颜色表吉凶，用"实心 / 空心"</b>——红只有一种，信息靠形状区分。
+    </p>
+  </section>
+
+  <!-- ============ 四、境界轴 ============ -->
+  <section>
+    <div class="label">四 · 境界轴（E 部，全站最值钱的一屏）</div>
+    <div class="axis">
+      <div class="rail">
+        <p class="rail-title">网文 · <em>线性升级链</em></p>
+        <div class="step"><div class="j">炼气</div><div class="d">凡人十三层 · 寿约百岁</div></div>
+        <div class="step"><div class="j">筑基</div><div class="d">灵气化液 · 御剑辟谷</div></div>
+        <div class="step"><div class="j">金丹</div><div class="d">灵力质变 · 寿五百</div></div>
+        <div class="step"><div class="j">元婴</div><div class="d">可离体夺舍 · 寿约千岁</div></div>
+        <div class="step"><div class="j">化神</div><div class="d">元婴转元神 · 寿约两千</div></div>
+        <div class="step"><div class="j">渡劫</div><div class="d">过则飞升仙界</div></div>
+      </div>
+      <div class="rail">
+        <p class="rail-title">真丹道 · <em>五等仙品（可跳级）</em></p>
+        <div class="step"><div class="j">鬼仙</div><div class="d">阴中超脱 · 终无所归</div></div>
+        <div class="step"><div class="j">人仙</div><div class="d">延年住世 · 一法一术</div></div>
+        <div class="step"><div class="j">地仙</div><div class="d">长生住世 · 未脱尘</div></div>
+        <div class="step"><div class="j">神仙</div><div class="d">脱质升仙 · 阴尽阳纯</div></div>
+        <div class="step"><div class="j">天仙</div><div class="d">与道合真 · 天人合一</div></div>
+      </div>
+    </div>
+    <p class="note">
+      两轨并排，一个开关来回切——<b>"名词是真丹道的，排序是文学加工的"</b>，这件事用一屏讲完。<br>
+      竖条刻度统一用朱砂方块，字号只靠"境名大、注小"拉开层级，不加线框。
+    </p>
+  </section>
+
+  <!-- ============ 五、详情态 ============ -->
+  <section>
+    <div class="label">五 · 详情态（点开一条之后）</div>
+    <div class="detail">
+      <div>
+        <figure class="silhouette">
+          <svg viewBox="0 0 120 80"><path d="M30 44 C42 30 78 30 92 44 C78 58 42 58 30 44 Z"/><path d="M30 44 L10 34 L15 44 L10 54 Z"/><path d="M58 34 C62 15 84 9 100 15 C88 23 72 30 62 37"/><circle cx="84" cy="42" r="1.7"/></svg>
+        </figure>
+        <p class="omen" style="margin-top:22px">凶 · 灾祸类</p>
+      </div>
+      <div>
+        <div class="k">原文</div>
+        <div class="v">鱼身鸟翼，音如鸳鸯，见则其邑大水。</div>
+        <div class="k">兆</div>
+        <div class="v">见则其邑大水</div>
+        <div class="k">出处</div>
+        <div class="v">《山海经》· 西山经</div>
+        <div class="k">写小说怎么用</div>
+        <div class="v use">灾兆系统：大水降临前的前置信号。适合放在"主角途经某地前"做伏笔——先出现鱼身鸟翼的影子，三章后洪水淹没此地。</div>
+      </div>
+    </div>
+    <p class="note">
+      "写小说怎么用"永远带朱砂左线，是全站唯一的固定强调位——<b>每一屏都要有一个地方提醒你：这是燃料，不是资料。</b>
+    </p>
+  </section>
+
+  <footer>
+    异兽志 · 卡片样式 v1 ｜ 2026-09-18 ｜ 依据：[[00-审美总纲]] 的 12 关键词（留白 · 克制 · 结构感 · 冷调 · 呼吸感 · 叙事性）<br>
+    待你确认：① 宣纸路线留不留 ② 主卡用 V1 还是 V2 ③ 竖排名的字号要不要再加一号 ④ 朱砂要不要更深/更亮
+  </footer>
+
+</div>
+</body>
+</html>
