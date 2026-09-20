@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 656" width="1180" height="656" font-family="'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 760" width="1180" height="760" font-family="'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif">
   <title>异兽志 · 数据流图</title>
-  <desc>内容流：ima 知识库摘要经人工提炼录入 data/*.json，提交后由 GitHub Pages 发布。用户流：浏览器 fetch 读取 JSON，校验建索引后渲染四个视图，用户操作触发收藏写入 localStorage，刷新后读回渲染，可导出 txt 或剪贴板。</desc>
+  <desc>内容流分两条素材线：文字线（ima 知识库摘要经人工提炼录入 data/*.json）与图片线（AI 生成/公版古籍图经人工筛选后期存入 assets/ 并记来源台账），两条线汇入 git 提交推送后由 GitHub Pages 发布。用户流：浏览器 fetch 读取 JSON 并加载图片，校验建索引后渲染四个视图，用户操作触发收藏写入 localStorage，刷新后读回渲染，可导出 txt 或剪贴板。</desc>
 
   <defs>
     <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -8,77 +8,106 @@
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="1180" height="656" fill="#FDFCF9"/>
+  <rect x="0" y="0" width="1180" height="760" fill="#FDFCF9"/>
 
   <text x="40" y="52" font-size="22" font-weight="500" fill="#1F1B18">异兽志 · 数据流图</text>
-  <text x="40" y="82" font-size="14" fill="#6B6157">两条流：内容流（人做，慢）与用户流（机器做，快）</text>
+  <text x="40" y="82" font-size="14" fill="#6B6157">内容流分文字线与图片线（人做，慢）· 用户流在浏览器内闭环（机器做，快）</text>
 
-  <rect x="40" y="110" width="1100" height="178" rx="16" fill="#F7F3EA" stroke="#1F1B18" stroke-opacity="0.12" stroke-width="1"/>
+  <!-- ============ 泳道① 内容流 ============ -->
+  <rect x="40" y="110" width="1100" height="280" rx="16" fill="#F7F3EA" stroke="#1F1B18" stroke-opacity="0.12" stroke-width="1"/>
   <text x="64" y="142" font-size="13" font-weight="500" fill="#A3302A">① 内容流 · 数据从哪来</text>
-  <text x="1116" y="142" font-size="12" fill="#6B6157" text-anchor="end">人做，一批一次</text>
+  <text x="1116" y="142" font-size="12" fill="#6B6157" text-anchor="end">人做，一批一次 · 文字与图片两条素材线</text>
 
-  <rect x="72" y="176" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="158" y="209" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">ima 知识库</text>
-  <text x="158" y="233" font-size="12" fill="#6B6157" text-anchor="middle">传统文化 6 篇摘要</text>
+  <text x="72" y="174" font-size="12" font-weight="500" fill="#A3302A">文字线</text>
+  <text x="72" y="290" font-size="12" font-weight="500" fill="#A3302A">图片线</text>
 
-  <rect x="288" y="176" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="374" y="209" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">人工提炼录入</text>
-  <text x="374" y="233" font-size="12" fill="#6B6157" text-anchor="middle">读素材，写条目</text>
+  <!-- 文字线 -->
+  <rect x="72" y="182" width="172" height="76" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="158" y="213" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">ima 知识库</text>
+  <text x="158" y="237" font-size="12" fill="#6B6157" text-anchor="middle">传统文化 6 篇摘要</text>
 
-  <rect x="504" y="176" width="172" height="80" rx="10" fill="#FDF3F2" stroke="#A3302A" stroke-width="1.5"/>
-  <text x="590" y="209" font-size="14" font-weight="500" fill="#A3302A" text-anchor="middle">data/*.json</text>
-  <text x="590" y="233" font-size="12" fill="#6B6157" text-anchor="middle">唯一真源</text>
+  <rect x="276" y="182" width="172" height="76" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="362" y="213" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">人工提炼录入</text>
+  <text x="362" y="237" font-size="12" fill="#6B6157" text-anchor="middle">读素材，写条目</text>
 
-  <rect x="720" y="176" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="806" y="209" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">git 提交推送</text>
-  <text x="806" y="233" font-size="12" fill="#6B6157" text-anchor="middle">每次一版记录</text>
+  <rect x="480" y="182" width="172" height="76" rx="10" fill="#FDF3F2" stroke="#A3302A" stroke-width="1.5"/>
+  <text x="566" y="213" font-size="14" font-weight="500" fill="#A3302A" text-anchor="middle">data/*.json</text>
+  <text x="566" y="237" font-size="12" fill="#6B6157" text-anchor="middle">文字的唯一真源</text>
 
-  <rect x="936" y="176" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="1022" y="209" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">GitHub Pages</text>
-  <text x="1022" y="233" font-size="12" fill="#6B6157" text-anchor="middle">只发文件，不跑逻辑</text>
+  <line x1="244" y1="220" x2="272" y2="220" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="448" y1="220" x2="476" y2="220" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
 
-  <line x1="244" y1="216" x2="284" y2="216" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="460" y1="216" x2="500" y2="216" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="676" y1="216" x2="716" y2="216" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="892" y1="216" x2="932" y2="216" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <!-- 图片线 -->
+  <rect x="72" y="298" width="172" height="76" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="158" y="329" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">AI 生成 / 公版图</text>
+  <text x="158" y="353" font-size="12" fill="#6B6157" text-anchor="middle">两条素材线 · 见 4.4</text>
 
-  <rect x="40" y="316" width="1100" height="300" rx="16" fill="#F7F3EA" stroke="#1F1B18" stroke-opacity="0.12" stroke-width="1"/>
-  <text x="64" y="348" font-size="13" font-weight="500" fill="#A3302A">② 用户流 · 数据到哪去</text>
-  <text x="1116" y="348" font-size="12" fill="#6B6157" text-anchor="end">机器做，每次点击 · 全程不出浏览器</text>
+  <rect x="276" y="298" width="172" height="76" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="362" y="329" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">人工筛选与后期</text>
+  <text x="362" y="353" font-size="12" fill="#6B6157" text-anchor="middle">逐张挑，做上色</text>
 
-  <rect x="72" y="382" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="158" y="415" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">浏览器 fetch</text>
-  <text x="158" y="439" font-size="12" fill="#6B6157" text-anchor="middle">读 data/*.json</text>
+  <rect x="480" y="298" width="172" height="76" rx="10" fill="#FDF3F2" stroke="#A3302A" stroke-width="1.5"/>
+  <text x="566" y="329" font-size="14" font-weight="500" fill="#A3302A" text-anchor="middle">assets/{id}.webp</text>
+  <text x="566" y="353" font-size="12" fill="#6B6157" text-anchor="middle">＋ SOURCES.md 台账</text>
 
-  <rect x="288" y="382" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="374" y="415" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">校验 + 建索引</text>
-  <text x="374" y="439" font-size="12" fill="#6B6157" text-anchor="middle">缺必填的不进列表</text>
+  <line x1="244" y1="336" x2="272" y2="336" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="448" y1="336" x2="476" y2="336" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
 
-  <rect x="504" y="382" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="590" y="415" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">渲染四个视图</text>
-  <text x="590" y="439" font-size="12" fill="#6B6157" text-anchor="middle">首屏 · 部内 · 详情 · 收藏</text>
+  <!-- 两条线汇合 -->
+  <path d="M652 220 H694 V278" fill="none" stroke="#6B6157" stroke-width="1.5"/>
+  <path d="M652 336 H694 V278" fill="none" stroke="#6B6157" stroke-width="1.5"/>
+  <line x1="694" y1="278" x2="732" y2="278" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
 
-  <rect x="720" y="382" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="806" y="415" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">用户操作</text>
-  <text x="806" y="439" font-size="12" fill="#6B6157" text-anchor="middle">搜索 · 切部 · 点卡片</text>
+  <rect x="736" y="238" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="822" y="271" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">git 提交推送</text>
+  <text x="822" y="295" font-size="12" fill="#6B6157" text-anchor="middle">文字与图片同一版记录</text>
 
-  <rect x="936" y="382" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="1022" y="415" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">localStorage</text>
-  <text x="1022" y="439" font-size="12" fill="#6B6157" text-anchor="middle">收藏只在本机浏览器</text>
+  <rect x="932" y="238" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="1018" y="271" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">GitHub Pages</text>
+  <text x="1018" y="295" font-size="12" fill="#6B6157" text-anchor="middle">只发文件，不跑逻辑</text>
 
-  <rect x="720" y="512" width="172" height="64" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
-  <text x="806" y="537" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">导出 .txt / 剪贴板</text>
-  <text x="806" y="559" font-size="12" fill="#6B6157" text-anchor="middle">含原文与出处</text>
+  <line x1="908" y1="278" x2="928" y2="278" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
 
-  <line x1="244" y1="422" x2="284" y2="422" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="460" y1="422" x2="500" y2="422" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="676" y1="422" x2="716" y2="422" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="892" y1="422" x2="932" y2="422" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="806" y1="462" x2="806" y2="508" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <!-- ============ 泳道② 用户流 ============ -->
+  <rect x="40" y="420" width="1100" height="300" rx="16" fill="#F7F3EA" stroke="#1F1B18" stroke-opacity="0.12" stroke-width="1"/>
+  <text x="64" y="452" font-size="13" font-weight="500" fill="#A3302A">② 用户流 · 数据到哪去</text>
+  <text x="1116" y="452" font-size="12" fill="#6B6157" text-anchor="end">机器做，每次点击 · 全程不出浏览器</text>
 
-  <path d="M1022 256 V302 H158 V376" fill="none" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
-  <text x="560" y="295" font-size="12" fill="#6B6157" text-anchor="middle">用户打开页面时读一次</text>
+  <rect x="72" y="486" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="158" y="519" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">浏览器 fetch</text>
+  <text x="158" y="543" font-size="12" fill="#6B6157" text-anchor="middle">读 JSON，加载图片</text>
 
-  <path d="M1022 462 V604 H590 V468" fill="none" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
-  <text x="806" y="592" font-size="12" fill="#6B6157" text-anchor="middle">刷新后读回，收藏还在</text>
+  <rect x="288" y="486" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="374" y="519" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">校验 + 建索引</text>
+  <text x="374" y="543" font-size="12" fill="#6B6157" text-anchor="middle">缺必填的不进列表</text>
+
+  <rect x="504" y="486" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="590" y="519" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">渲染四个视图</text>
+  <text x="590" y="543" font-size="12" fill="#6B6157" text-anchor="middle">首屏 · 部内 · 详情 · 收藏</text>
+
+  <rect x="720" y="486" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="806" y="519" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">用户操作</text>
+  <text x="806" y="543" font-size="12" fill="#6B6157" text-anchor="middle">搜索 · 切部 · 点卡片</text>
+
+  <rect x="936" y="486" width="172" height="80" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="1022" y="519" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">localStorage</text>
+  <text x="1022" y="543" font-size="12" fill="#6B6157" text-anchor="middle">收藏只在本机浏览器</text>
+
+  <rect x="720" y="616" width="172" height="64" rx="10" fill="#FFFFFF" stroke="#1F1B18" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="806" y="641" font-size="14" font-weight="500" fill="#1F1B18" text-anchor="middle">导出 .txt / 剪贴板</text>
+  <text x="806" y="663" font-size="12" fill="#6B6157" text-anchor="middle">含原文与出处</text>
+
+  <line x1="244" y1="526" x2="284" y2="526" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="460" y1="526" x2="500" y2="526" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="676" y1="526" x2="716" y2="526" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="892" y1="526" x2="932" y2="526" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="806" y1="566" x2="806" y2="612" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+
+  <!-- 跨流：Pages 到用户流 -->
+  <path d="M1022 318 V408 H232 V482" fill="none" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <text x="248" y="474" font-size="12" fill="#6B6157">用户打开页面时读一次</text>
+
+  <!-- 回环：localStorage 到渲染 -->
+  <path d="M1022 566 V700 H590 V570" fill="none" stroke="#6B6157" stroke-width="1.5" marker-end="url(#ar)"/>
+  <text x="806" y="690" font-size="12" fill="#6B6157" text-anchor="middle">刷新后读回，收藏还在</text>
 </svg>
