@@ -24,3 +24,7 @@ Thumbs.db
 # 打卡上传中间产物（含 ima COS 临时凭证 JSON，绝不入库）
 checkin/_build/
 *.genie
+
+# 私有版图片（观山海等版权图源）：永不入库，规则见 TECH_DESIGN.md §4.4.4
+# 顺序硬规矩：先有这一行，再往 assets-private/ 里放图
+yizhi/assets-private/
