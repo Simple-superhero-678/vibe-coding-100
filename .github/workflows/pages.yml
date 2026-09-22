@@ -49,9 +49,12 @@ jobs:
         run: |
           set -euo pipefail
           test -f _site/index.html || { echo '::error::发布目录里没有 index.html'; exit 1; }
-          漏=$(find _site \( -name '*.md' -o -name '预览' -o -name 'assets-private' -o -name '_*' \) -print)
-          if [ -n "$漏" ]; then
-            echo '::error::发布目录里混进了过程文件：'; echo "$漏"; exit 1
+          # ⚠️ 变量名必须是 ASCII：bash 不允许中文标识符。
+          #   写 `漏=$(...)` 时 bash 不认这是赋值，会当成命令名去找，
+          #   报 command not found 并以 127 退出（首次运行就是这么红掉的）。
+          LEAK=$(find _site -mindepth 1 \( -name '*.md' -o -name '预览' -o -name 'assets-private' -o -name '_*' \) -print)
+          if [ -n "$LEAK" ]; then
+            echo '::error::发布目录里混进了过程文件：'; echo "$LEAK"; exit 1
           fi
           echo '--- 发布内容清单 ---'
           find _site -type f | sort
