@@ -83,9 +83,10 @@ vibe coding打卡学习/          ← 仓库根
     │   ├── data.js           ← 数据层：读 JSON + 校验
     │   ├── search.js         ← 检索层：建索引 + 排序
     │   └── views/grid.js     ← 视图层：图鉴网格 + 筛选谓词
-    ├── data/yishou.json      ← ① 内容真源：异兽部（当前 1 条）
-    ├── assets/               ← 公开图（进 git）+ SOURCES.md 来源台账
-    └── assets-private/       ← 私有图（不进 git，仅本机）
+    ├── data/yishou.json      ← ① 内容真源：异兽部（当前 12 条）
+    ├── assets/               ← 公开图 12 张（进 git）+ SOURCES.md 来源台账
+    ├── assets-private/       ← 私有图（不进 git，仅本机；当前为空）
+    └── 异兽部-12条名单.md      ← 正文底稿（与 JSON 两处同步）
 ```
 
 目录纪律：**代码只改 `yizhi/`**；数据只改 `data/*.json`（页面是渲染结果，在页面上改不落地）。
