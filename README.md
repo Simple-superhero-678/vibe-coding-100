@@ -12,9 +12,9 @@
 | 妖怪 | 六类分组（妖 / 魔 / 鬼 / 怪 / 精 / 灵）+ 分期年表 | 20 |
 | 境界 | 竖轴 · 双序列（网文九阶 / 真丹道五等） | 14 |
 
-**线上地址：`https://simple-superhero-678.github.io/vibe-coding-100/`**
+**线上地址：`https://simple-superhero-678.github.io/vibe-coding-100/`** —— **已上线**（2026-09-22 19:55）。仓库 `Settings → Pages → Source = GitHub Actions` 已启用，流水线 `build` + `deploy` 双绿；线上实测：运行时资源（首页 / `css` / `js` / 五份 `data/*.json` / `assets/*.webp`）全部 200，过程文件（底稿、台账、`预览/`、`assets-private/`）全部 404。
 
-> 首次上线需在 GitHub 网页点一次：`Settings → Pages → Source` 选 **GitHub Actions**（我改不了仓库设置，这步得人来）。之后每次 push 到 `main`，页面约 1 分钟自动更新。
+> 之后每次 push 到 `main` 且改到 `yizhi/`，约 1 分钟自动重新发布。想手动触发：Actions 页 → 左侧「发布异兽志到 GitHub Pages」→ **Run workflow**。
 
 > 真源文档：`PRD.md`（做什么、验收标准）· `TECH_DESIGN.md`（怎么做、接口契约）· `AGENTS.md`（协作规矩）· `yizhi/画风提示词.md`（出图口径）
 
