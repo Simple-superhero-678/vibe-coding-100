@@ -130,7 +130,14 @@
   border:1px solid var(--hairline);
   padding:14px;
   padding-right:46px;                /* 给右上角朱砂印章让位 */
+  cursor:pointer;                    /* 整张卡可点开详情（M4）：鼠标要看得出来 */
+  transition:border-color .16s var(--ease);
 }
+/* 可点的反馈：边框转为墨色。不用投影、不用位移 —— 全站禁阴影堆叠 */
+.card:hover{border-color:var(--ink-2)}
+.card:hover .card-name{color:var(--cinnabar)}
+/* 键盘走到卡片上要看得见位置（卡片带 tabindex，M4 起可 Tab 到） */
+.card:focus-visible{outline:2px solid var(--cinnabar);outline-offset:2px}
 
 /* 画心托裱：图外一圈宣纸白边 + 一道淡墨细框。
    padding 让图略微内收（约裁 3%），主体反而更满 —— 出图的画面留白本来就大。 */

@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/views.css">
+<link rel="stylesheet" href="css/detail.css">
+<link rel="stylesheet" href="css/voyage.css">
 </head>
 <body>
 <div class="shell">
@@ -46,6 +48,9 @@
         <input class="seek" id="搜索框" type="search" autocomplete="off"
                placeholder="输入名字、俗称或小说称号（例：妲己）">
         <nav class="bu-tabs" id="部tabs" aria-label="五部"></nav>
+        <!-- 收藏入口（F5）。刻意不做成第六个「部」：部 tab 的选中态是墨色实底，
+             这个是「去看我存下来的东西」，用朱砂描边区分开，也不给它 aria-current。 -->
+        <button class="bu-fav" id="收藏入口" type="button">收藏<span class="bu-fav-n" id="收藏计数">0</span></button>
       </div>
     </section>
 
@@ -104,6 +109,22 @@
   <span class="float-seal fs-2">封存</span>
   <span class="float-seal fs-3">观测站</span>
 </div>
+
+<!-- 详情面板的挂载点（F3）：内容由 js/views/detail.js 现画、main.js 决定何时打开。
+     不把五件套写死在这里 —— 条目是可变的，静态 HTML 只能写骨架，写骨架就多一份要维护的结构。 -->
+<div id="面板挂载"></div>
+
+<!-- 收藏面板（F5·V4）：骨架是固定的，条目列表由 js/views/fav.js 填进 #收藏列表 -->
+<dialog class="panel-fav" id="收藏面板" aria-label="收藏夹">
+  <header class="panel-head">
+    <h2 class="panel-title">收藏</h2>
+    <p class="panel-count" id="收藏说明">0 条</p>
+    <button type="button" class="act act-export" id="导出收藏">导出全部</button>
+    <button type="button" class="act act-close" id="关收藏">收起</button>
+  </header>
+  <p class="panel-hint" id="收藏提示" role="status"></p>
+  <div class="fav-body" id="收藏列表"></div>
+</dialog>
 
 <script type="module" src="js/main.js"></script>
 </body>

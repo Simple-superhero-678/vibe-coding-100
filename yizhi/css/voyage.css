@@ -1,0 +1,154 @@
+/* 异兽志 · 转场层（F4 · 云中仙槎）
+   建立：2026-09-22（Day 7 M4）｜ 依据：yizhi/云中仙槎转场方案.md、PRD 8.4
+   纪律：三色上限（宣纸 / 墨 / 朱砂）；禁阴影堆叠、圆角、emoji；渐变只演「光打在纸上」。
+   这一层是**过场**，不是视图：它盖住整页，播完就消失，不承载任何信息。
+
+   时间轴（首播 3.3s，百分比按它算）：
+      0–24%   ① 舟内：船帮在，云气缓移
+     24–48%   ② 出舟：船帮向外滑出、淡出
+     16–84%   ③ 飞掠：三层剪影由慢到快横移
+     84–100%  ④ 停靠：剪影停住，朱砂的舟升起放大
+   短版（.is-short）把 --t 压到 .19，整场约 620ms。 */
+
+.voyage{
+  --t:1;
+
+  position:fixed;
+  inset:0;
+  z-index:60;
+  overflow:hidden;
+  /* 过场底就是「纸」：允许渐变（只演光怎么打在纸上，见 tokens.css 限定条款） */
+  background:
+    linear-gradient(168deg, var(--paper-hi) 0%, var(--paper-mid) 42%, var(--paper) 68%, var(--paper-lo) 100%);
+}
+.voyage.is-short{--t:.19}
+
+/* 离场：onDone 已经跑过了（详情面板就在底下），这里只是把这层抹掉。
+   pointer-events:none 很要紧 —— 淡出的 220ms 里不能再挡住对详情面板的点击。 */
+.voyage.is-leaving{
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .22s var(--ease);
+}
+
+/* —— 三层剪影 ——
+   每层的位移量恰好是自己的 tile 宽的整数倍，所以 repeat-x 的底纹永远接得上缝。
+   位移曲线是「分段有限」而不是无限循环：这样 84% 处能真的停住（分镜 ④ 要求减速归零）。
+
+   ⚠️ width 必须比视口宽得多（300%）：这一层是**整体平移**的，
+   全程要走 1400px 以上。如果它只有一屏宽，后半程整块滑出视口，
+   画面右半边就只剩空纸（实测抓到了这一帧：远山、中景全跑光，只剩朱砂的舟）。
+   300% 配上父层的 overflow:hidden，既无缝又不给页面添横向滚动。 */
+.voy-layer{
+  position:absolute;
+  left:0;bottom:0;
+  width:300%;
+  height:100%;
+  background-repeat:repeat-x;
+  background-position:0 100%;
+  will-change:transform;
+  animation-duration:calc(3.3s * var(--t));
+  animation-timing-function:linear;
+  animation-fill-mode:both;
+}
+
+/* 远山：走得最慢 —— tile 720，全程位移 1440（两个 tile） */
+.voy-l1{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='260'%3E%3Cpath d='M0 260 V176 Q90 132 180 168 Q270 204 360 152 Q450 100 540 158 Q630 216 720 170 V260 Z' fill='%236B6157' fill-opacity='.28'/%3E%3C/svg%3E");
+  background-size:720px 100%;
+  opacity:.85;
+  animation-name:voyDrift1;
+}
+@keyframes voyDrift1{
+  0%,10%{transform:translateX(0)}
+  50%{transform:translateX(-540px)}
+  84%,100%{transform:translateX(-1440px)}
+}
+
+/* 中景山：快一档 —— tile 480，全程位移 1440（三个 tile） */
+.voy-l2{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='220'%3E%3Cpath d='M0 220 V150 L70 74 L140 148 L200 60 L270 152 L340 96 L410 156 L480 110 V220 Z' fill='%236B6157' fill-opacity='.40'/%3E%3C/svg%3E");
+  background-size:480px 78%;
+  opacity:.9;
+  animation-name:voyDrift2;
+}
+@keyframes voyDrift2{
+  0%,10%{transform:translateX(0)}
+  50%{transform:translateX(-620px)}
+  84%,100%{transform:translateX(-1440px)}
+}
+
+/* 近景树石：最快 —— tile 280，全程位移 1400（五个 tile） */
+.voy-l3{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='150'%3E%3Cpath d='M0 150 V104 Q70 72 140 106 Q210 140 280 100 V150 Z' fill='%231F1B18' fill-opacity='.30'/%3E%3Cpath d='M46 104 V74 M52 104 V82 M188 108 V78 M196 108 V86' stroke='%231F1B18' stroke-opacity='.30' stroke-width='3'/%3E%3C/svg%3E");
+  background-size:280px 40%;
+  opacity:.9;
+  animation-name:voyDrift3;
+}
+@keyframes voyDrift3{
+  0%,10%{transform:translateX(0)}
+  50%{transform:translateX(-680px)}
+  84%,100%{transform:translateX(-1400px)}
+}
+
+/* 云气：最慢的一层，只在 ① 段看得见（② 段开始被船帮的位移带出去）。
+   形状走的是古籍云头的画法：上缘一串弧、下缘一条直边 ——
+   最初拿三个椭圆拼，出来像一排卵石，不像云。左右边界的 y 都是 54，
+   所以 repeat-x 接得上，不会在中缝露一道台阶。 */
+.voy-cloud{
+  position:absolute;left:0;right:0;top:0;bottom:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='64'%3E%3Cpath d='M0 54 Q26 34 58 46 Q82 22 116 40 Q140 18 172 38 Q196 16 228 40 Q252 24 276 46 Q292 42 300 54 Z' fill='%236B6157' fill-opacity='.15'/%3E%3C/svg%3E");
+  background-repeat:repeat-x;
+  background-position:0 30%;
+  background-size:420px auto;
+  animation:voyCloud calc(18s * var(--t)) linear infinite;
+}
+/* 位移量必须等于云纹 tile 的宽度（420px，见上）：差一点就会在中缝露台阶。
+   改 tile 尺寸时这里要一起改。 */
+@keyframes voyCloud{from{background-position-x:0}to{background-position-x:-420px}}
+
+/* —— 船帮（① 段的前景，② 段出画）——
+   上下两道浓墨，靠窗的一侧是弧 —— 用一条 `contain` 拉伸的 SVG 出弧线。
+   为什么用 SVG 而不是 border-radius：全站禁用圆角（tokens.css 禁止清单），
+   弧线只能画出来，不能靠 UI 属性蹭出来。 */
+.voy-cabin{
+  position:absolute;inset:0;
+  animation:voyCabinOut calc(3.3s * var(--t)) var(--ease) both;
+}
+.hull{position:absolute;left:0;right:0;background-repeat:no-repeat;background-size:100% 100%}
+.hull-top{
+  top:0;height:17vh;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='240' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H1200 V84 Q600 190 0 84 Z' fill='%231F1B18' fill-opacity='.88'/%3E%3C/svg%3E");
+}
+.hull-bottom{
+  bottom:0;height:20vh;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='280' preserveAspectRatio='none'%3E%3Cpath d='M0 280 H1200 V196 Q600 90 0 196 Z' fill='%231F1B18' fill-opacity='.88'/%3E%3C/svg%3E");
+}
+@keyframes voyCabinOut{
+  0%,24%{opacity:1;transform:none}
+  48%,100%{opacity:0;transform:scale(1.5)}
+}
+
+/* —— 朱砂的舟 —— 全场唯一不动的东西，锚住视线；④ 段升起放大成印。
+   它就是「印章」的前身：详情面板打开时，这枚朱砂正好在名字上方（见 detail.css 的 .detail-seal）。 */
+.voy-boat{
+  position:absolute;left:50%;top:64%;
+  width:120px;height:44px;
+  margin-left:-60px;margin-top:-22px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='44'%3E%3Cpath d='M4 24 H116 L98 39 Q60 45 22 39 Z' fill='%23A3302A'/%3E%3Cpath d='M60 24 V6 M60 13 H86' stroke='%23A3302A' stroke-width='3' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-size:100% 100%;
+  animation:voyBoat calc(3.3s * var(--t)) var(--ease) both;
+}
+@keyframes voyBoat{
+  0%,58%{transform:translateY(0) scale(1)}
+  64%{transform:translateY(-5px) scale(1.02)}
+  70%{transform:translateY(3px) scale(1)}
+  84%{transform:translateY(-14px) scale(1.5)}
+  100%{transform:translateY(-56px) scale(3.4);opacity:.9}
+}
+
+/* 系统开了「减少动态效果」：这一层根本不该被建出来（transit.js 已经拦了），
+   这里再兜一道 —— 万一别处漏了，至少别动。 */
+@media(prefers-reduced-motion: reduce){
+  .voyage{display:none}
+}
