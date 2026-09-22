@@ -28,3 +28,7 @@ checkin/_build/
 # 私有版图片（观山海等版权图源）：永不入库，规则见 TECH_DESIGN.md §4.4.4
 # 顺序硬规矩：先有这一行，再往 assets-private/ 里放图
 yizhi/assets-private/
+
+# 出图过程样张（预览/样图/）：带水印的原始输出 + 中间裁切版
+# 依据 TECH_DESIGN §11.3「预览/ 属过程文件，不进发布内容」；且图片一旦入库就永久留在历史里
+yizhi/预览/样图/

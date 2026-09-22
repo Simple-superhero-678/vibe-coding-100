@@ -6,20 +6,103 @@
 <title>异兽志</title>
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/views.css">
 </head>
 <body>
 <div class="shell">
 
+  <!-- 卷首：左「题识」+ 右「题签」，中间留白。
+       题识（09-22 追加）填掉卷首左侧那块约 672×252 的空档。
+       文字是本站自题 —— 落款写「自题」，免得被当成古籍引文。 -->
   <header class="hero">
+    <aside class="preface">
+      <span class="preface-seal" aria-hidden="true">志异</span>
+      <span class="preface-mark">自题</span>
+      <p class="preface-text">取山海之奇<br>供落笔之用</p>
+    </aside>
     <div class="meta">
-      为写网文服务的中国超自然世界观查阅站<br>
-      M0 · 骨架就绪 · 2026-09-18
+      <p class="meta-lead">为写网文服务的<br>中国超自然世界观查阅站</p>
+      <p class="meta-line"><span id="站况">异兽部</span></p>
     </div>
-    <h1 class="v-title">异兽志</h1>
+    <div class="title-block">
+      <span class="title-rule" aria-hidden="true"></span>
+      <h1 class="v-title">异兽志</h1>
+      <span class="title-seal" aria-hidden="true">志</span>
+    </div>
   </header>
 
-  <p class="empty">骨架已立。M1 灌数据，M2 出卡片，M3 上图鉴。</p>
+  <!-- 版心鱼尾：古籍版心的标记，纯装饰 -->
+  <div class="tail" aria-hidden="true"></div>
 
+  <!-- 卷轴（09-22 追加）：把「搜索 → 筛选 → 卡片」整段卷起来。
+       上下各一条轴 —— 轴面有迎光/背光两道，两端各一枚朱砂菱轴头，全用 CSS 画。
+       轴比正文宽出 10px：卷面总比写在纸上的字阔一点，这是卷轴的常识，也是它跟
+       「一个带边框的 div」的区别。 -->
+  <div class="scroll">
+    <span class="scroll-roller roller-top" aria-hidden="true"></span>
+
+    <section class="finder">
+      <div class="finder-inner">
+        <input class="seek" id="搜索框" type="search" autocomplete="off"
+               placeholder="输入名字、俗称或小说称号（例：妲己）">
+        <nav class="bu-tabs" id="部tabs" aria-label="五部"></nav>
+      </div>
+    </section>
+
+    <!-- 吉凶筛选（F2 · 异兽部的部内筛选入口）
+         按钮与条数由 main.js 渲染：条数标在按钮上是刻意的 —— 让「点下去有没有东西」先被看见。
+         E 部境界无 `吉凶` 字段（TECH_DESIGN §5.2），切到那部时整条隐藏。 -->
+    <nav class="filter" id="吉凶筛选" aria-label="按吉凶筛选"></nav>
+
+    <section class="grid" id="图鉴网格" aria-label="图鉴网格"></section>
+
+    <span class="scroll-roller roller-bottom" aria-hidden="true"></span>
+  </div>
+
+  <footer class="colophon">
+    <span class="colophon-mark" aria-hidden="true"></span>
+    <p class="colophon-text">异兽志 · 图鉴</p>
+    <span class="colophon-seal" aria-hidden="true">异兽</span>
+  </footer>
+
+</div>
+
+<!-- 页边装饰：取古籍「版框 + 书耳」的形。
+     09-22 追加（填掉四周空旷）：版框改四周双边 · 四角折角 · 框外两侧菱格纹带 ·
+     上下书眉 · 左右书耳各一枚。
+     同日再加密（本轮四条：「卷轴」+ 云纹 + 垂挂书签 + 水墨底 + 漂浮印章）：
+     云纹与漂浮印章只活在**版框内的边角空白**（书尾两侧、卷首左、卡片右）；
+     垂挂书签挂到**版框之外**的页面边缘 —— 那里只有视口够宽（≥1300px）才腾得出地方。
+     纯装饰、不承载信息、不接收点击；窄屏整体隐藏（PRD 8.6 不横向滚动）。 -->
+<div class="margins" aria-hidden="true">
+  <span class="margin-frame"></span>
+  <span class="margin-band band-left"></span>
+  <span class="margin-band band-right"></span>
+  <span class="margin-brow"></span>
+
+  <!-- 垂挂书签（09-22）：原来是版框内一枚巴掌大的书耳，太单薄，改成真书签 ——
+       签身是 SVG 现画的符牌形（上平、下剪燕尾），顶上缀一枚朱砂菱作挂钉。
+       左右各一枚：单侧挂签，页面一看就偏。 -->
+  <span class="margin-tab tab-left">
+    <span class="tab-dot"></span>
+    <span class="tab-text">异兽部·卷之一</span>
+  </span>
+  <span class="margin-tab tab-right">
+    <span class="tab-dot"></span>
+    <span class="tab-text">二〇二六年秋</span>
+  </span>
+
+  <!-- 云纹（09-22）：只飘在版框内的边角空白处（书尾左右）。半透明极淡，
+       远看是纸上的暗花，近看才认得出是云头。 -->
+  <span class="margin-cloud cloud-a"></span>
+  <span class="margin-cloud cloud-b"></span>
+
+  <!-- 漂浮印章（09-22）：三枚不同高度、不同大小的半透明朱砂印，填卷首左、卡片右、
+       书尾左三处空白。opacity 压到 .12 —— 这一层的目标是「暗花」，不是「水印」；
+       调高就会变成抢眼的色块，把它想填的那种「空」反而放大。 -->
+  <span class="float-seal fs-1">山海</span>
+  <span class="float-seal fs-2">封存</span>
+  <span class="float-seal fs-3">观测站</span>
 </div>
 
 <script type="module" src="js/main.js"></script>

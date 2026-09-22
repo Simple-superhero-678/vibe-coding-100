@@ -1,32 +1,328 @@
-/* 异兽志 · 页面骨架（M0） */
+/* 异兽志 · 页面骨架
+   建立：2026-09-18（M0）｜ 09-22 Day 7 视觉升级：卷首题签 + 版心鱼尾 + 书尾
+   规矩：三色上限（宣纸 / 墨 / 朱砂）。所有纹样用 CSS/SVG 现画，全站不引图片。 */
 
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 
 body{
-  background-color:var(--paper-deep);
-  background-image:var(--noise);
+  position:relative;          /* .margins 的绝对定位参照：让它能量到整页高度（09-22） */
+  /* 水墨底（09-22）：原来是纯 --paper-deep 平涂，1536 宽下摊成一大片，四周没有「气」。
+     现在四层叠，从最上往最下：
+       ① 纸纹（--noise）—— 压在最上面，任何底都得先有纸的颗粒
+       ② 中心打光 —— 自上方 10% 处散开一片米色，页面中段“聚气”，四角自然沉下去
+       ③ 右下青墨压角 —— 一点点冷调，让右下角退到后面去，衬出对角的亮
+       ④ 对角底色 —— 左上米（--paper-hi）走到右下青灰（--paper-lo），152° 是与正文行向
+          （横排）+ 版框（方）都不平行的角度，斜着走才不会和版框的直线打架
+     为什么不做成单一 linear-gradient：单一道斜线只是「左上亮右下暗」，
+     没有「中间有一口光」的聚拢感，卷首会显得浮。
+     background-color 兜底写 --paper-lo：万一某浏览器不认多层，也不至于是白底。 */
+  background-color:var(--paper-lo);
+  background-image:
+    var(--noise),
+    radial-gradient(122% 66% at 50% 8%, rgba(250,246,238,.74) 0%, rgba(250,246,238,0) 64%),
+    radial-gradient(92% 96% at 100% 100%, var(--wash) 0%, rgba(52,62,64,0) 62%),
+    linear-gradient(152deg, var(--paper-hi) 0%, var(--paper-mid) 36%, var(--paper-lo) 100%);
   color:var(--ink);
   font-family:var(--sans);
   line-height:1.9;
   -webkit-font-smoothing:antialiased;
 }
 
-.shell{max-width:var(--shell);margin:0 auto;padding:var(--breath) var(--pad-x) 16vh}
+.shell{max-width:var(--shell);margin:0 auto;padding:var(--breath) var(--pad-x) var(--foot)}
+
+/* —— 卷轴（09-22）——
+   把「搜索 → 筛选 → 卡片」这段卷起来：上下各一条轴。
+   轴面用三道极浅的渐变堆出来 —— 上缘背光、中段迎光、下缘再背光。
+   目标是「看上去这一刻纸是卷起来的」，不是画一根木轴：
+   一旦画实（深色木纹、粗边、投影），它就从纸的一部分变成一个贴上去的零件。
+   轴左右各外扩 10px：卷面比写在纸上的字阔一点，这是卷轴与「带边框的 div」的分野。 */
+.scroll{position:relative;margin-top:20px;padding:26px 0 24px}
+
+.scroll-roller{
+  position:absolute;left:-10px;right:-10px;height:15px;
+  border-top:1px solid rgba(31,27,24,.22);
+  border-bottom:1px solid rgba(31,27,24,.09);
+  background:linear-gradient(180deg,
+    rgba(31,27,24,.10) 0%,
+    rgba(31,27,24,.03) 22%,
+    rgba(253,250,244,.92) 52%,
+    rgba(255,255,255,.55) 64%,
+    rgba(31,27,24,.04) 70%,
+    rgba(31,27,24,.10) 100%);
+}
+.roller-top{top:0}
+/* 下轴是同一根轴的镜像：光从上面来，卷到底时迎光面必然翻到下方 */
+.roller-bottom{bottom:0;transform:scaleY(-1)}
+
+/* 轴头：左右各一枚朱砂菱（与鱼尾、书眉上的菱同一语言）。
+   不画成圆头木轴 —— 圆头一出现，整页就滑向「卷轴插画」而不是「纸上的一道痕」。 */
+.scroll-roller::before,.scroll-roller::after{
+  content:"";position:absolute;top:50%;width:10px;height:10px;
+  transform:translateY(-50%) rotate(45deg);
+  background:var(--cinnabar);opacity:.6;
+}
+.scroll-roller::before{left:-5px}
+.scroll-roller::after{right:-5px}
+
+/* —— 卷首题签 ——
+   东方骨架靠排版与界栏立，不靠贴图。竖排站名居右，左侧留题识与印。 */
+.hero{display:flex;justify-content:flex-end;align-items:flex-start;gap:48px}
+
+.hero .meta{max-width:340px;font-size:13px;color:var(--ink-2);letter-spacing:.08em;line-height:2.1}
+.meta-lead{margin:0}
+/* 站况前一条朱砂短线：卷首的「起笔」 */
+.meta-line{margin:10px 0 0;display:flex;align-items:center;gap:12px}
+.meta-line::before{content:"";width:22px;height:1px;background:var(--cinnabar);flex:none}
+
+.title-block{display:flex;align-items:stretch;gap:16px}
 
 /* 竖排标题：东方骨架靠排版立，不靠贴图 */
 .v-title{
   writing-mode:vertical-rl;
   font-family:var(--serif);
   font-weight:400;
-  font-size:62px;
-  letter-spacing:.28em;
+  font-size:50px;      /* 09-22：62 → 50，压首屏高度；气场靠竖排与字距，不靠字号 */
+  letter-spacing:.24em;
   line-height:1;
   margin:0;
 }
 
-.hero{display:flex;justify-content:flex-end;align-items:flex-start;gap:48px}
-.hero .meta{max-width:360px;font-size:13px;color:var(--ink-2);letter-spacing:.08em;line-height:2.1}
+/* 界栏：标题左起的一条朱砂竖线，长度随标题自动 */
+.title-rule{width:2px;background:var(--cinnabar);flex:none}
+
+/* 落款印：朱砂方印，白文反面（阳文），压在标题末锋 */
+.title-seal{
+  align-self:flex-end;
+  width:34px;height:34px;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--cinnabar);color:var(--paper);
+  font-family:var(--serif);font-size:17px;line-height:1;
+}
+
+/* —— 卷首题识（09-22 追加）——
+   卷首原本只有右侧题签，左边空出约 672×252 —— 全页最大的一块空档（1536 宽实测）。
+   古籍卷首的左位正是「题跋」：正文自右起，落款在末，印压落款下。这里照此排。
+   文字是本站自题、不假托古人，所以落款写明「自题」。 */
+.preface{display:none}
+
+@media(min-width:860px){
+  .preface{
+    display:flex;align-items:flex-start;gap:13px;
+    margin-right:auto;          /* 把「题识 + 题签」一并顶到最右，题识留在左 */
+    padding-top:6px;
+  }
+  .preface-text{
+    writing-mode:vertical-rl;   /* 竖排：先读右列，所以正文在最右 */
+    margin:0;
+    font-family:var(--serif);
+    font-size:16px;letter-spacing:.3em;line-height:1.9;
+    color:var(--ink-2);opacity:.86;
+  }
+  /* 落款：贴在正文最左一列（竖排的「末」），小一号、更淡 */
+  .preface-mark{
+    align-self:flex-end;margin-bottom:2px;
+    writing-mode:vertical-rl;
+    font-family:var(--serif);font-size:11px;letter-spacing:.24em;
+    color:var(--ink-2);opacity:.6;
+  }
+  /* 闲章：压在落款之下（视觉底端对齐），全站第三枚朱砂印 */
+  .preface-seal{
+    align-self:flex-end;
+    width:30px;height:30px;flex:none;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--cinnabar);color:var(--paper);
+    font-family:var(--serif);font-size:13px;line-height:1;
+    writing-mode:vertical-rl;letter-spacing:.02em;
+  }
+}
+
+/* —— 版心鱼尾 ——
+   古籍版心上下端的标记，只作分隔，不承载信息。 */
+.tail{
+  position:relative;
+  height:1px;margin-top:26px;
+  background:var(--hairline);
+}
+.tail::before{
+  content:"";position:absolute;left:50%;top:50%;
+  width:54px;height:15px;
+  transform:translate(-50%,-50%);
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 54 15'%3E%3Cpath d='M27 1 L32 7.5 L27 14 L22 7.5 Z' fill='%23A3302A'/%3E%3Cpath d='M0 7.5 H16 M38 7.5 H54' stroke='%23A3302A' stroke-width='1'/%3E%3C/svg%3E") no-repeat center/contain;
+}
+
+/* —— 书尾 —— */
+.colophon{margin-top:44px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.colophon-mark{width:7px;height:7px;background:var(--cinnabar);transform:rotate(45deg)}
+.colophon-text{
+  margin:0;
+  font-family:var(--serif);
+  font-size:12px;letter-spacing:.22em;color:var(--ink-2);
+}
+/* 牌记印（09-22 追加）：书尾收束用。三字竖排，38px 见方 —— 比卡片角标大、比卷首闲章小。 */
+.colophon-seal{
+  width:38px;height:38px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--cinnabar);color:var(--paper);
+  font-family:var(--serif);font-size:12px;line-height:1.03;
+  writing-mode:vertical-rl;letter-spacing:.04em;
+  opacity:.92;
+}
+
+/* —— 页边装饰 · 版框 + 纹带 + 书耳 + 书眉（09-22 追加，同日加密） ——
+   取古籍的形：四周双边版框、四角双层折角（外墨内朱）、框外两侧菱格纹带、
+   版框内侧挂竖排书耳、版框上方居中一枚书眉。
+   做法：全部 CSS/SVG 现画，仍不引图片；absolute 定位不占布局；窄屏整体隐藏。
+   为什么只在 ≥1180px 显示：--shell 是 1080px，只有视口宽过 1180 才腾得出页边空白，
+   窄屏若强行留边会把正文挤到 PRD 8.6 禁止的横向滚动里。
+
+   09-22 加密的理由（实测）：1536 宽下版框外左右各留 198px 空白带、上下各 58px ——
+   四面全空，所以「四周空旷」。加的都贴在版框上，不往页心飘：
+   贴框才有「版框 / 框外装饰带」的层次，飘在空白正中间会像一条迷路的虚线。 */
+
+.margins{display:none}
+
+@media(min-width:1180px){
+  /* 用 absolute 而非 fixed：版框要框住整页内容，而不是钉在首屏屏幕上。
+     参照是 body（已给 position:relative），于是 inset:0 量到的是整页高度。 */
+  .margins{display:block;position:absolute;inset:0;z-index:-1;pointer-events:none}
+
+  /* 版框：内容区外 30px 一圈，上下各收 5.5vh。四角的折角用 4 张镜像角花贴上去。
+     框内叠一层极淡纸色（比 --paper-deep 亮半档）：像宣纸铺在深一色的书案上，
+     差量刻意做小 —— 要的是「隐约分得出纸和案」，不是分块。 */
+  .margin-frame{
+    position:absolute;
+    top:calc(var(--breath) - 24px);bottom:calc(var(--foot) - 24px);
+    left:calc(50vw - var(--shell)/2 - 30px);
+    right:calc(50vw - var(--shell)/2 - 30px);
+    border:1px solid var(--rule);
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='38'%3E%3Cpath d='M25 0 V25 H0' fill='none' stroke='%231F1B18' stroke-opacity='.30'/%3E%3Cpath d='M17 0 V17 H0' fill='none' stroke='%23A3302A' stroke-opacity='.45'/%3E%3C/svg%3E") left  top    /38px 38px no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='38'%3E%3Cpath d='M13 0 V25 H38' fill='none' stroke='%231F1B18' stroke-opacity='.30'/%3E%3Cpath d='M21 0 V17 H38' fill='none' stroke='%23A3302A' stroke-opacity='.45'/%3E%3C/svg%3E") right top    /38px 38px no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='38'%3E%3Cpath d='M25 38 V13 H0' fill='none' stroke='%231F1B18' stroke-opacity='.30'/%3E%3Cpath d='M17 38 V21 H0' fill='none' stroke='%23A3302A' stroke-opacity='.45'/%3E%3C/svg%3E") left  bottom /38px 38px no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='38'%3E%3Cpath d='M13 38 V13 H38' fill='none' stroke='%231F1B18' stroke-opacity='.30'/%3E%3Cpath d='M21 38 V21 H38' fill='none' stroke='%23A3302A' stroke-opacity='.45'/%3E%3C/svg%3E") right bottom /38px 38px no-repeat;
+    background-color:rgba(244,239,228,.55);   /* 必须在 background 简写之后，否则被重置为透明 */
+  }
+  /* 四周双边：内里再收一条细线。古籍常见做法，一笔就让「一个框」变成「一块版」 */
+  .margin-frame::after{
+    content:"";position:absolute;inset:7px;
+    border:1px solid var(--rule);opacity:.55;
+  }
+
+  /* 菱格纹带：贴在版框外侧，每条 12px 宽、上下随框。
+     菱格首尾相接成链，是古籍边饰里最省话的一种；用朱砂细线，
+     与卡片角标、印章同属一个强调色，不引入第四色。 */
+  .margin-band{
+    position:absolute;
+    top:calc(var(--breath) - 22px);bottom:calc(var(--foot) - 22px);
+    width:12px;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='26' viewBox='0 0 12 26'%3E%3Cpath d='M6 .5 L11.5 13 L6 25.5 L.5 13 Z' fill='none' stroke='%23A3302A' stroke-opacity='.42'/%3E%3C/svg%3E") repeat-y center top;
+  }
+  .band-left{left:calc(50vw - var(--shell)/2 - 42px)}
+  .band-right{right:calc(50vw - var(--shell)/2 - 42px)}
+
+  /* 书眉：版框上方居中一枚。上下都空着的时候，一条「线—菱—线」就能把页顶收住。 */
+  .margin-brow{
+    position:absolute;
+    top:max(8px,calc(var(--breath) - 54px));
+    left:50%;transform:translateX(-50%);
+    display:flex;align-items:center;justify-content:space-between;
+    width:132px;height:9px;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Cpath d='M4.5 .5 L8.5 4.5 L4.5 8.5 L.5 4.5 Z' fill='%23A3302A' fill-opacity='.8'/%3E%3C/svg%3E") center/9px 9px no-repeat;
+  }
+  .margin-brow::before,.margin-brow::after{content:"";width:58px;height:1px;background:var(--rule)}
+
+  /* —— 垂挂书签（09-22 · 替换原书耳）——
+     原先是版框内侧一枚小签（书耳），宝哥说「太单薄」。现在改成真书签：
+     挂在**版框之外**的页面边缘、垂下来 —— 签身是 SVG 现画的符牌形（上平、下剪燕尾），
+     顶上缀一枚朱砂菱作挂钉，下方一小段挂绳，中间竖排文字。
+     为什么挂到版框外面：签的体量一大，塞进版框与正文之间那 30px 就会顶到折角；
+     挂到页面边缘，它才真的像「夹在书里、垂出来的一枚签」。
+     代价：版框外只有 ≥1300px 才有约 80px 可用 → 书签另设更宽的门槛，见下。 */
+  .margin-tab{display:none}
+
+  /* —— 云纹（09-22）——
+     只飘在版框内的边角空白（书尾左右两侧）。用「三凸云头 + 一道云脚」的极简画法，
+     不画山、不画水 —— 版框内已经是满的，再画远山就成了贴图。
+     半透 + 淡墨：远看是纸上的暗花，近看才认得出是云。 */
+  .margin-cloud{
+    position:absolute;
+    width:212px;height:88px;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='212' height='88' viewBox='0 0 212 88'%3E%3Cg fill='none' stroke='%231F1B18' stroke-opacity='.26' stroke-width='1.1' stroke-linecap='round'%3E%3Cpath d='M16 70 C16 56 28 47 40 51 C40 34 58 25 72 35 C84 17 112 19 122 36 C138 25 158 34 158 52 C172 50 184 58 184 70'/%3E%3Cpath d='M16 70 H184'/%3E%3Cpath d='M46 70 C46 61 53 55 62 56'/%3E%3Cpath d='M98 70 C98 58 108 51 119 54'/%3E%3Cpath d='M150 70 C150 61 143 55 134 56'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;
+    opacity:.62;pointer-events:none;
+  }
+  /* 右侧那朵水平镜像：同一朵云翻过来，两朵才不会像复制粘贴 */
+  .cloud-a{left: calc(50vw - var(--shell)/2 + 34px);bottom:62px}
+  .cloud-b{right:calc(50vw - var(--shell)/2 + 34px);bottom:62px;transform:scaleX(-1)}
+
+  /* —— 漂浮印章（09-22）——
+     三枚不同大小、不同高度的半透明朱砂印，填卷首中段、卡片右、书尾左三处空白。
+     opacity 压到 .12：这一层的目标是「暗花」，不是「水印」。
+     调高反而更空 —— 一块显眼的色块会把人的眼睛吸过去，然后把周围那么大片的空白一起暴露出来。
+     为什么写成元素而不是背景图：这三枚要各自落在不同的空白块里，位置得单独调。 */
+  .float-seal{
+    position:absolute;pointer-events:none;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--cinnabar);color:var(--paper);
+    font-family:var(--serif);
+    writing-mode:vertical-rl;letter-spacing:.1em;line-height:1;
+    opacity:.12;
+  }
+  /* 卷首中段的空档（题识与题签之间，约 500px 宽） */
+  .fs-1{left:calc(50vw - var(--shell)/2 + 300px);top:calc(var(--breath) + 46px);width:64px;height:64px;font-size:21px}
+  /* 卡片右侧的空栏。数据灌满后这里会被第二列卡片盖住 —— 那是刻意的：
+     有内容时它自己退场，只有页面还空着的时候才现身。 */
+  .fs-2{left:calc(50vw - var(--shell)/2 + 620px);top:46%;width:58px;height:58px;font-size:18px}
+  /* 卡片右侧的空栏 · 下：与 fs-2 一上一下，右侧那道竖空白才不至于只填了半截。
+     为什么不放书尾左方：那里本来留给云纹，第一版两件叠在一起，红块压在云头上。 */
+  .fs-3{right:calc(50vw - var(--shell)/2 + 42px);top:65%;width:58px;height:58px;font-size:15px}
+}
+
+/* 书签需要更宽的门槛：1180–1300 之间版框外只剩十几像素，挂不下 52px 的签。 */
+@media(min-width:1300px){
+  .margin-tab{
+    display:flex;flex-direction:column;align-items:center;
+    position:absolute;
+    top:12.5vh;
+    width:52px;height:224px;
+    padding:34px 0 30px;
+    /* 签身渐变：迎着光的纸面 → 压在下层的一面。
+     ⚠️ data URI 里不能用 CSS 变量，所以下面这两个色号是 --paper-hi / 一个比 --paper-lo
+        略暖的纸色的**誊抄**；以后改令牌，这里得手动跟着改（或改回纯色 fill）。 */
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='52' height='224' viewBox='0 0 52 224' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='.18' y2='1'%3E%3Cstop offset='0' stop-color='%23F8F3E9'/%3E%3Cstop offset='1' stop-color='%23E6DFD0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M.5 .5 H51.5 V196 L26 223.5 L.5 196 Z' fill='url(%23g)' stroke='%231F1B18' stroke-opacity='.2'/%3E%3C/svg%3E") center/100% 100% no-repeat;
+  }
+  /* 左签贴页面左缘，右签对称。clamp 下限 2px 是给 1300 附近留的余量（那时版框外只剩 6px），
+     上限 200px 防止超宽屏把签甩得离正文太远（那时它看着就不像挂在这页上了）。
+     -104px 而不是 -92px：菱格纹带的外缘在 -48px 处，签要跟它留 10px，否则两条边挨在一起。 */
+  .tab-left {left: clamp(2px, calc(50vw - var(--shell)/2 - 104px), 200px)}
+  .tab-right{right:clamp(2px, calc(50vw - var(--shell)/2 - 104px), 200px)}
+
+  /* 挂钉：一枚朱砂菱，与鱼尾、书眉、轴头同一种符号 */
+  .margin-tab::before{
+    content:"";position:absolute;left:50%;top:-15px;
+    width:9px;height:9px;margin-left:-4.5px;
+    background:var(--cinnabar);opacity:.7;
+    transform:rotate(45deg);
+  }
+  /* 挂绳：钉与签之间那 9px 的线。没有它，菱就浮在半空、不像是把签吊住的 */
+  .margin-tab::after{
+    content:"";position:absolute;left:50%;top:-9px;width:1px;height:9px;
+    background:rgba(31,27,24,.22);
+  }
+  .tab-dot{width:6px;height:6px;background:var(--cinnabar);opacity:.66;flex:none;margin-bottom:11px}
+  .tab-text{
+    writing-mode:vertical-rl;
+    font-family:var(--serif);
+    font-size:13px;letter-spacing:.22em;line-height:1;
+    color:var(--ink-2);opacity:.82;
+    /* ⚠️ 竖排元素必须有这一条：竖排的「换行」就是换到第二列。
+       第一版写「异兽部 · 卷之一」（含两个空格 = 9 个字符位），超出签身内高，
+       于是「之一」两个字被悄悄挤到左边第二列 —— 看上去像排版错，其实是正常的竖排换行。
+       现在：文字去空格（7 字）+ 签身加高到 224px + nowrap 三重保险。 */
+    white-space:nowrap;
+  }
+}
+
 
 .label{
   display:flex;align-items:center;gap:12px;
@@ -43,7 +339,13 @@ body{
 }
 
 @media(max-width:720px){
-  .shell{padding:8vh 22px 12vh}
-  .hero{gap:26px}
-  .v-title{font-size:44px}
+  .shell{padding:3.5vh 20px 5vh}
+  .hero{gap:18px}
+  .v-title{font-size:34px;letter-spacing:.2em}
+  .hero .meta{max-width:210px;font-size:12px;line-height:1.95}
+  .title-block{gap:11px}
+  .title-seal{width:26px;height:26px;font-size:13px}
+  .title-rule{width:2px}
+  .tail{margin-top:18px}
+  .colophon{margin-top:30px}
 }

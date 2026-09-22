@@ -1,0 +1,242 @@
+/* 异兽志 · 视图样式
+   建立：2026-09-22（Day 7 第 1 步）｜ 依据：PRD §9 体验原则 ①④、TECH_DESIGN §4.2
+   09-22 视觉升级：图片放大并做「画心托裱」、卡片留白重排、网格断点放宽。
+   纪律：三色上限（宣纸 / 墨 / 朱砂）。禁渐变、阴影堆叠、圆角、emoji 图标、第二种红。 */
+
+/* —— 检索区（F1 的入口；查询逻辑第 5 步已接 js/search.js） ——
+   上方由 .tail（版心鱼尾）分界、外面由 .scroll（卷轴）卷起来，这里只留一条下线。 */
+.finder{
+  margin-top:0;                  /* 09-22 卷轴化：上边距交给 .scroll 的 padding，不再重复 */
+  border-bottom:1px solid var(--hairline);
+  padding:10px 0 12px;
+}
+/* 09-22 密化：搜索框与五部 tab 并成一条控制带 —— 原来各占一整行，白吃掉约 110px 首屏 */
+.finder-inner{display:flex;align-items:center;gap:32px}
+.finder-inner .seek{flex:1;min-width:0}
+.seek{
+  width:100%;
+  appearance:none;-webkit-appearance:none;
+  background:transparent;
+  color:var(--ink);
+  font-family:var(--serif);
+  font-size:18px;
+  letter-spacing:.06em;
+  border:0;
+  border-bottom:2px solid transparent;  /* 恒留 2px，避免聚焦时跳动 */
+  padding:4px 2px 6px;
+  outline:none;
+}
+.seek::placeholder{color:var(--ink-2);opacity:.7;font-size:15px;letter-spacing:.04em}
+.seek:focus{border-bottom-color:var(--cinnabar)}   /* 全站唯一动的一笔 */
+.seek::-webkit-search-cancel-button{-webkit-appearance:none}
+
+/* —— 五部 tab（F2 的入口；异兽本位，其余四部 M6 补数据） —— */
+.bu-tabs{display:flex;flex-wrap:wrap;gap:10px;flex:none}
+.bu{
+  font-family:var(--serif);
+  font-size:15px;letter-spacing:.2em;
+  color:var(--ink-2);background:transparent;
+  border:1px solid var(--hairline);
+  padding:9px 18px 9px 20px;
+  cursor:pointer;
+  transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);
+}
+.bu:hover:not([disabled]){border-color:var(--ink-2);color:var(--ink)}
+.bu[aria-current="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.bu[disabled]{opacity:.4;cursor:not-allowed}
+
+/* —— 吉凶筛选条（F2 异兽部的部内筛选入口，PRD 8.2） ——
+   与五部 tab 同为「一行按钮」，但刻意换一种形态，好让两个维度一眼分得开：
+     部 tab  = 方框 + 墨色块选中（切换「看哪一部」）
+     吉凶条  = 无框文字 + 朱砂下划线选中（筛选是「状态」，用全站唯一的强调色）
+   条数徽标是刻意的：让「点下去有没有东西」先被看见，而不是点完才发现空。
+   0 条的值只弱化、不禁用 —— 禁用会让人以为「这个分类不存在」，
+   而它只是暂时没数据，12 条灌进来就满了。点了会落到「清除筛选」的出口上（PRD 9.2 ②）。 */
+.filter{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:2px;
+  padding:12px 0 0;
+}
+.filter[hidden]{display:none}
+.filter-label{
+  font-family:var(--serif);font-size:12px;letter-spacing:var(--track-mid);
+  color:var(--ink-2);margin-right:12px;
+}
+.chip{
+  appearance:none;-webkit-appearance:none;
+  background:transparent;border:0;
+  font-family:var(--serif);
+  font-size:14px;letter-spacing:.14em;
+  color:var(--ink-2);
+  padding:3px 11px 5px;
+  border-bottom:2px solid transparent;   /* 恒留 2px，选中时只换色不跳动 */
+  cursor:pointer;
+  /* 比全站 --dur(.6s) 快得多：筛选是「点完要立刻看到反馈」的交互，
+     用 .6s 会有一段「点了像没点上」的空窗（实测截图抓到过这个中间帧）。 */
+  transition:color .16s var(--ease),border-color .16s var(--ease),opacity .16s var(--ease);
+}
+.chip:hover{color:var(--ink)}
+/* 「当前 0 条」弱化 —— 必须写在选中态之前：
+   两个规则特异性一样（都是 .chip + 一个属性选择器），同分时后写的赢。 */
+.chip[data-空="1"]{opacity:.42}
+.chip[data-空="1"] .chip-n{opacity:1}    /* 数字不再叠第二层透明，否则那个「0」根本看不清 */
+/* 选中态压过上面的弱化：否则点了「凶恶」这类空分类，是朱砂色但整颗 42% 透明，
+   看起来跟没选中一样 —— 而它恰恰是最需要看清「我开了哪个筛选」的时候。 */
+.chip[aria-pressed="true"]{color:var(--cinnabar);border-bottom-color:var(--cinnabar);opacity:1}
+.chip-n{
+  font-family:var(--sans);
+  font-size:11px;letter-spacing:0;
+  margin-left:6px;
+  color:var(--ink-2);opacity:.7;
+}
+.chip[aria-pressed="true"] .chip-n{color:var(--cinnabar);opacity:.85}
+.chip-sep{
+  width:1px;height:13px;margin:0 10px;
+  background:var(--hairline);
+  align-self:center;
+}
+
+/* —— 图鉴网格（V2 横排极简卡：列表页与搜索结果共用，见 09-21 拍板「选 C」） ——
+   09-22：列宽下限 330 → 400；卡片另有 560px 宽度上限（写在 .card 上）。
+   为什么要上限：横排卡的图列是相对宽度的百分比，卡片越宽图占比越小。
+   实测 900px 视口单列撑满 812px 时，图只占卡片的 29%，又变回「图很小」。 */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(400px,1fr));
+  gap:22px;
+  margin-top:18px;
+  padding-bottom:6px;            /* 09-22 卷轴化：下边距并进 .scroll 的 padding，不再各给一次 */
+  /* 乌丝栏（09-22 追加）：抄书页上那层淡墨竖格，铺在卡片背后。
+     为什么加：条目只有一条时，1536 宽下网格右列会空出 507×323（实测）——
+     空着像没做完。铺一层极淡竖格，那块空白就从「缺东西」变成「纸已经备好」。
+     卡片自带宣纸底色，会自动盖住自己身下的格子，所以只有空白处看得见。 */
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='9'%3E%3Cpath d='M0 0 V9' stroke='%231F1B18' stroke-opacity='.13'/%3E%3C/svg%3E");
+  background-size:44px 9px;
+  background-position:0 0;
+  background-repeat:repeat;
+}
+
+/* 09-22 图放大：图列改成「随卡片宽自适应 + 上下限」。
+   原来写死 108px，而卡片是弹性宽 → 卡片越宽图占比越小（22%），视觉上就成了「图很小」。
+   现在图固定在 180–232px，占卡片宽约 45%，比例锁 3:4（与 assets 出图一致，不形变）。 */
+.card{
+  position:relative;
+  display:grid;
+  grid-template-columns:clamp(180px,52%,232px) 1fr;
+  gap:18px;
+  max-width:560px;                   /* 卡片过宽则图占比崩，见上 */
+  justify-self:center;               /* 单列时居中，不贴左边 */
+  background:var(--paper);           /* 卡片底用宣纸亮色，与页面底色分层 */
+  border:1px solid var(--hairline);
+  padding:14px;
+  padding-right:46px;                /* 给右上角朱砂印章让位 */
+}
+
+/* 画心托裱：图外一圈宣纸白边 + 一道淡墨细框。
+   padding 让图略微内收（约裁 3%），主体反而更满 —— 出图的画面留白本来就大。 */
+.portrait,.portrait-empty{
+  width:100%;height:auto;aspect-ratio:3/4;
+  display:block;object-fit:cover;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  padding:6px;
+}
+.portrait-empty{border:1px solid var(--hairline)}   /* 图缺失时的安静空框，不出破图标 */
+
+.card-body{min-width:0}
+.card-name{
+  margin:0;
+  font-family:var(--serif);font-weight:400;
+  font-size:24px;letter-spacing:.1em;color:var(--ink);
+}
+/* 名前的朱砂方点：条目的「起笔」，也让名字不显得孤零零 */
+.card-name::before{
+  content:"";display:inline-block;
+  width:7px;height:7px;background:var(--cinnabar);
+  margin-right:11px;vertical-align:.18em;
+}
+.card-alias{margin:8px 0 0;font-size:13px;color:var(--ink-2);letter-spacing:.06em}
+
+/* 原文：引文块，与白话明确分开（PRD 8.3） */
+.card-quote{
+  margin:14px 0 0;
+  font-family:var(--serif);
+  font-size:14.5px;line-height:2;color:var(--ink-2);
+  border-left:2px solid var(--cinnabar);
+  padding-left:12px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+
+/* 写小说怎么用：条目存在的理由，卡片上必须露出来 */
+.card-use{
+  margin:14px 0 0;
+  font-size:13px;line-height:1.85;color:var(--ink);
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.card-use::before{
+  content:"用法";
+  display:inline-block;margin-right:8px;
+  font-family:var(--serif);font-size:11px;letter-spacing:.14em;
+  color:var(--cinnabar);border:1px solid var(--cinnabar);padding:0 4px;
+}
+
+.card-src{margin:12px 0 0;font-size:12.5px;color:var(--ink-2);letter-spacing:.1em}
+.card-src::before{content:"出处";margin-right:8px;color:var(--cinnabar);letter-spacing:.16em}
+
+/* 朱砂印章：方形角标，标吉凶（PRD 8.6 的三个识别特征之一） */
+.seal{
+  position:absolute;top:0;right:0;
+  width:42px;height:42px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--cinnabar);color:var(--paper);
+  font-family:var(--serif);font-size:13px;line-height:1;
+  writing-mode:vertical-rl;letter-spacing:.06em;
+}
+
+/* —— 数据层给回来的两种非正常态（TECH_DESIGN §9-1/3） —— */
+.load-fail,.grid-empty,.zero{grid-column:1/-1}
+.load-fail{border-left:2px solid var(--cinnabar);padding:18px 0 18px 16px}
+.load-fail-msg{margin:0;font-family:var(--serif);font-size:15px;letter-spacing:.1em;color:var(--ink)}
+.load-fail-why{margin:6px 0 14px;font-size:12.5px;color:var(--ink-2)}
+.grid-empty{margin:0;font-family:var(--serif);font-size:15px;letter-spacing:.1em;color:var(--ink-2)}
+
+/* —— 零结果：不给死胡同（PRD 9.2 ② / TECH_DESIGN §9-9）
+     一句人话 → 相近条目（可点，点了换成它去搜）→ 「清空，看全部」的退路。
+     朱砂左竖线沿用 load-fail 的语言：这两块都是「出了状况，但有出路」。 —— */
+.zero{border-left:2px solid var(--cinnabar);padding:18px 0 18px 16px}
+.zero-msg{margin:0;font-family:var(--serif);font-size:15px;letter-spacing:.1em;color:var(--ink)}
+.zero-lead{margin:8px 0 0;font-size:12.5px;color:var(--ink-2)}
+.zero-near{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 16px}
+.near{
+  appearance:none;-webkit-appearance:none;
+  font-family:var(--serif);
+  font-size:14px;letter-spacing:.1em;
+  color:var(--ink);background:transparent;
+  border:1px solid var(--hairline);
+  padding:6px 13px 6px 15px;
+  cursor:pointer;
+  transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease);
+}
+.near:hover{border-color:var(--cinnabar);color:var(--cinnabar)}
+
+/* —— 手机宽度：单列，不横向滚动（PRD 8.6 / 9.2 ④） —— */
+@media(max-width:720px){
+  .finder{margin-top:12px;padding:8px 0 10px}
+  .finder-inner{flex-wrap:wrap;gap:14px}      /* 搜索框与 tab 一条挤不下，落回两行 */
+  .finder-inner .seek{flex-basis:100%}
+  .seek{font-size:17px}
+  .bu-tabs{flex:1 1 100%;gap:8px}              /* 落到自己一行并占满，避免溢出容器 */
+  .bu{font-size:13px;padding:7px 11px 7px 13px;letter-spacing:.12em}
+  .filter{padding-top:10px;row-gap:2px}
+  .filter-label{margin-right:8px}
+  .chip{font-size:13px;padding:3px 8px 4px;letter-spacing:.1em}
+  .chip-sep{margin:0 6px}
+  .grid{grid-template-columns:1fr;justify-content:stretch;gap:16px;margin-top:14px}
+  .card{grid-template-columns:132px 1fr;gap:14px;padding:13px;padding-right:48px}
+  .card-name{font-size:19px}
+  .card-name::before{width:6px;height:6px;margin-right:9px}
+  .card-alias{margin-top:6px}
+  .card-quote{margin-top:10px;font-size:13.5px}
+  .card-use{margin-top:10px}
+  .card-src{margin-top:9px}
+  .portrait,.portrait-empty{padding:4px}
+}
