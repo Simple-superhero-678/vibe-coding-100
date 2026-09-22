@@ -51,9 +51,17 @@ function 建段(标签, 内容节点, 额外类) {
 
 function 建原文(条) {
   const 块 = document.createElement('blockquote');
-  块.className = 'detail-quote';
+  块.className = 'detail-quote' + (条.原文性质 ? ' is-plain' : '');
   块.textContent = 条.原文;
   return 块;
+}
+
+/* 「原文」这一栏的标签 ——
+   M6 起境界部的网文九境没有古籍原文（PRD §4 E 部规则：不假托古籍、不编造原文），
+   它们的 `原文` 字段装的是**当代通行设定**。那就照实标成「通行设定」：
+   同样是引文块，但读者一眼知道这不是从古书里抄的。 */
+function 原文标签(条) {
+  return 条.原文性质 || '原文';
 }
 
 function 建出处(条) {
@@ -69,6 +77,10 @@ function 建译文(条) {
   块.className = 'detail-trans';
   if (条.译文) {
     块.textContent = 条.译文;
+  } else if (条.原文性质) {
+    /* 原文本来就是白话（通行设定），给它配一句译文是废话 —— 说清原因，而不是写「暂无译文」 */
+    块.classList.add('detail-none');
+    块.textContent = '此条所录即当代通行说明，没有古文需要转译。';
   } else {
     块.classList.add('detail-none');
     块.textContent = '此条暂无译文。原文已录，译文待补。';
@@ -140,30 +152,37 @@ export function renderDetail(条) {
 
   const 隶 = document.createElement('p');
   隶.className = 'detail-meta';
-  隶.textContent = `${条.部}部` + (条.吉凶 ? ` · ${条.吉凶}` : '');
+  /* 归属行：哪一部 + 吉凶（A–D 部有）+ 序列（境界部有）。缺的都不占位。 */
+  隶.textContent = `${条.部}部`
+    + (条.吉凶 ? ` · ${条.吉凶}` : '')
+    + (条.序列 ? ` · ${条.序列}` : '');
   头.append(隶);
 
   面板.append(头);
 
-  /* —— 身：图在左（章式），五件套在右 —— */
+  /* —— 身：图在左（章式），五件套在右 ——
+     M6 起只有异兽部有形象图。没图就不摆这一栏（见 detail.css 的 .no-figure）——
+     「图缺失时给安静空框」是卡片上的兜底，不是详情页的：这里图位很大，空着比没有更难看。 */
   const 身 = document.createElement('div');
-  身.className = 'detail-body';
+  身.className = 'detail-body' + (条.图 ? '' : ' no-figure');
 
-  const 图区 = document.createElement('figure');
-  图区.className = 'detail-figure';
-  图区.append(建图(条));
-  if (条.吉凶) {
-    const 印 = document.createElement('figcaption');
-    印.className = 'detail-seal';
-    印.textContent = 条.吉凶;
-    图区.append(印);
+  if (条.图) {
+    const 图区 = document.createElement('figure');
+    图区.className = 'detail-figure';
+    图区.append(建图(条));
+    if (条.吉凶) {
+      const 印 = document.createElement('figcaption');
+      印.className = 'detail-seal';
+      印.textContent = 条.吉凶;
+      图区.append(印);
+    }
+    身.append(图区);
   }
-  身.append(图区);
 
   const 文区 = document.createElement('div');
   文区.className = 'detail-text';
 
-  文区.append(建段('原文', 建原文(条), 'row-quote'));
+  文区.append(建段(原文标签(条), 建原文(条), 'row-quote'));
   文区.append(建段('出处', 建出处(条)));
   文区.append(建段('译文', 建译文(条)));
   if (条.异说 && 条.异说.length) 文区.append(建段('异说', 建异说(条)));
@@ -203,13 +222,13 @@ export function renderDetail(条) {
   const 复制 = 建钮('复制全文', 'act act-copy');
   复制.dataset.act = '复制';
   复制.addEventListener('click', () => {
-    面板.dispatchEvent(new CustomEvent(事件_导出请求, { bubbles: true, detail: { id: 条.id, 方式: '复制' } }));
+    面板.dispatchEvent(new CustomEvent(导出请求, { bubbles: true, detail: { id: 条.id, 方式: '复制' } }));
   });
 
   const 下载 = 建钮('下载 txt', 'act act-download');
   下载.dataset.act = '下载';
   下载.addEventListener('click', () => {
-    面板.dispatchEvent(new CustomEvent(事件_导出请求, { bubbles: true, detail: { id: 条.id, 方式: '下载' } }));
+    面板.dispatchEvent(new CustomEvent(导出请求, { bubbles: true, detail: { id: 条.id, 方式: '下载' } }));
   });
 
   const 关 = 建钮('收起', 'act act-close');

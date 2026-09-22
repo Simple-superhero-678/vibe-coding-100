@@ -1,0 +1,72 @@
+name: 发布异兽志到 GitHub Pages
+
+# 部署纪律（TECH_DESIGN §11.3 / README §三）：
+#   只发 yizhi/ 这一层，且**只发运行时要的东西** ——
+#   过程文件（*.md 底稿与台账、预览/ 出图样张、assets-private/ 私有原图、
+#   以 _ 开头的临时探针与校验脚本）一律不进发布内容。
+#   站点根 = yizhi/，所以线上地址是 https://<用户>.github.io/<仓库>/ ，不带 /yizhi/ 前缀。
+#
+# 为什么不用 GitHub 的「Deploy from a branch」：那条路会跑 Jekyll，
+#   中文文件名与 {{ 之类的字符会被它当模板处理，且没法排除 *.md。
+#   这里走 artifact 直传，产物原样上线，没有任何加工。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'yizhi/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只允许一次发布；排队中的旧任务作废，避免旧版本覆盖新版本
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 组装发布目录（排除过程文件）
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          rsync -a \
+            --exclude='*.md' \
+            --exclude='预览/' \
+            --exclude='assets-private/' \
+            --exclude='_*' \
+            yizhi/ _site/
+
+      - name: 发布纪律自检（不进发布内容的东西一个都不许漏）
+        run: |
+          set -euo pipefail
+          test -f _site/index.html || { echo '::error::发布目录里没有 index.html'; exit 1; }
+          漏=$(find _site \( -name '*.md' -o -name '预览' -o -name 'assets-private' -o -name '_*' \) -print)
+          if [ -n "$漏" ]; then
+            echo '::error::发布目录里混进了过程文件：'; echo "$漏"; exit 1
+          fi
+          echo '--- 发布内容清单 ---'
+          find _site -type f | sort
+          echo "共 $(find _site -type f | wc -l) 个文件"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

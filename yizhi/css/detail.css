@@ -61,6 +61,11 @@
   gap:26px;
   padding:22px 26px;
 }
+/* 没有形象图的条目（M6：神仙/神话/妖怪/境界四部暂无配图）整块**不摆图位**。
+   理由：空的 3:4 画心在详情这种大尺寸下就是一大块空白，比「没有图」本身更难看；
+   而 detail.js 里那条「图缺失时给安静空框」的兜底是给**卡片**用的（那里图位小，空着不刺眼）。
+   所以这里不是画空框，是这一栏根本不出现。 */
+.detail-body.no-figure{grid-template-columns:1fr}
 .detail-figure{
   margin:0;
   align-self:start;
@@ -110,11 +115,14 @@
   border-left:3px solid var(--cinnabar);
   padding:2px 0 2px 16px;
 }
+/* 非古籍的「原文」（M6：境界部网文九境的通行设定）——
+   同样是主角块，但字号收一档：现代白话用古文的 17px/2.15 行距会显得空。
+   真正的区分在**标签**上（那一栏写「通行设定」而不是「原文」），版式这里只做配合。 */
+.detail-quote.is-plain{font-size:16px;line-height:2;letter-spacing:.01em}
 .detail-src{
   margin:0;font-family:var(--serif);
   font-size:14px;letter-spacing:.1em;color:var(--ink);
-}
-.detail-trans{margin:0;font-size:14.5px;line-height:2;color:var(--ink)}
+}.detail-trans{margin:0;font-size:14.5px;line-height:2;color:var(--ink)}
 /* 缺项明示（PRD 9.2 ③）：写「暂无译文」，不是留白 */
 .detail-none{color:var(--ink-2);font-style:normal}
 
@@ -265,6 +273,15 @@ span.fav-open:hover .fav-name{color:var(--ink-2)}
   margin-right:10px;vertical-align:.16em;
 }
 .fav-src{font-size:12.5px;letter-spacing:.08em;color:var(--ink-2);flex:none}
+/* 部标（M6）：收藏夹跨五部，一条从哪一部来必须写在脸上。
+   用墨色描边小签，与朱砂（吉凶 / 强调）刻意分开 —— 它只是「出身」，不是重点。 */
+.fav-bu{
+  flex:none;
+  font-family:var(--serif);font-size:11.5px;letter-spacing:.16em;
+  color:var(--ink-2);
+  border:1px solid var(--hairline);
+  padding:1px 6px 1px 8px;
+}
 .fav-remove{
   appearance:none;-webkit-appearance:none;
   flex:none;

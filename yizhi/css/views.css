@@ -95,6 +95,15 @@
   background:var(--hairline);
   align-self:center;
 }
+/* 部工具条下的说明行（境界部的「序列副题 + 说明」）——
+   占满整条另起一行：这两句正是「两套序列差在哪」的答案，不能挤在按钮旁边当注解。
+   它是唯一一处「工具条里有正文」的地方，所以给它自己的行高与淡墨，不做成 chip。 */
+.filter-note{
+  flex-basis:100%;
+  margin:9px 0 0;
+  font-size:12.5px;line-height:1.85;letter-spacing:.05em;
+  color:var(--ink-2);
+}
 
 /* —— 图鉴网格（V2 横排极简卡：列表页与搜索结果共用，见 09-21 拍板「选 C」） ——
    09-22：列宽下限 330 → 400；卡片另有 560px 宽度上限（写在 .card 上）。
@@ -247,4 +256,360 @@
   .card-use{margin-top:10px}
   .card-src{margin-top:9px}
   .portrait,.portrait-empty{padding:4px}
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   部内浏览的四种形态（V2）· M5 起
+   ══════════════════════════════════════════════════════════════════════
+   异兽部用 .grid（网格 + 乌丝栏）；其余四部共用 .stage —— 一个不带网格与
+   乌丝栏的素容器：谱系树、时间轴、六类分组、境界竖轴各画各的骨架，
+   但共用一个「不抢戏」的底，免得四种形态各带一套背景。
+
+   四部形态都遵守同一件事：条目行整行可点，data-id 在行上，装配层靠它反查。 */
+
+.stage{
+  margin-top:18px;
+  padding-bottom:6px;
+}
+
+/* —— 境界竖轴（境界部）——
+   全站最值得做的一屏（PRD §4）：两套序列长得像、含义完全不同，必须一眼分得开。
+   同一根墨轴、同一套排版，只在两处区分：
+     · 阶号字样：网文 1..9（阿拉伯数字 = 进度）／真丹道 一等..五等（汉字 = 品第）
+     · 阶章底色：网文 空圈描墨边／真丹道 朱砂实印
+   轴是「贯穿所有阶章中心的一根线」：首行从阶章中心起、末行到阶章中心止，
+   不做成一条通到底的直线 —— 线伸出末章之外，会读成「还有下一阶」。 */
+.axis{margin-top:4px}
+.axis-list{list-style:none;margin:0;padding:0}
+
+.axis-node{
+  position:relative;
+  display:grid;
+  grid-template-columns:46px 1fr;
+  gap:20px;
+  padding:16px 0;
+}
+.axis-node::before{
+  content:"";position:absolute;left:23px;top:0;bottom:0;width:1px;
+  background:var(--rule);z-index:0;      /* 轴在阶章之下：章压线，线不通章 */
+}
+.axis-node:first-child::before{top:23px}
+.axis-node.is-last::before{bottom:auto;height:23px}
+
+.axis-rank{
+  position:relative;z-index:1;
+  width:46px;height:46px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--paper);
+  border:1px solid var(--ink);
+  color:var(--ink);
+  font-family:var(--serif);font-size:14px;letter-spacing:0;
+  white-space:nowrap;
+}
+/* 真丹道：朱砂实印。品第是「名次」，用全站唯一的强调色标；网文是进度，空圈即可 ——
+   两套序列的阶章因此不必读字就能分辨。 */
+.axis[data-序列="真丹道"] .axis-rank{
+  background:var(--cinnabar);border-color:var(--cinnabar);color:var(--paper);
+  font-size:12.5px;
+}
+
+.axis-body{min-width:0;padding-top:2px}
+.axis-name{
+  margin:0;
+  font-family:var(--serif);font-weight:400;
+  font-size:22px;letter-spacing:.1em;color:var(--ink);
+}
+.axis-name::before{
+  content:"";display:inline-block;
+  width:6px;height:6px;background:var(--cinnabar);
+  margin-right:10px;vertical-align:.2em;
+}
+.axis-alias{margin:6px 0 0;font-size:13px;color:var(--ink-2);letter-spacing:.06em}
+.axis-quote{
+  margin:10px 0 0;
+  font-family:var(--serif);
+  font-size:14.5px;line-height:2;color:var(--ink-2);
+}
+.axis-src{margin:10px 0 0;font-size:12.5px;color:var(--ink-2);letter-spacing:.1em}
+.axis-src::before{content:"出处";margin-right:8px;color:var(--cinnabar);letter-spacing:.16em}
+
+/* 可点的反馈：与卡片同一套语言 —— 名转朱砂 + 墨色焦点框，不用投影、不用位移 */
+.axis-node{cursor:pointer}
+.axis-node:hover .axis-name{color:var(--cinnabar)}
+.axis-node:focus-visible{outline:2px solid var(--cinnabar);outline-offset:2px}
+
+/* —— 手机宽度：轴行两端同时收窄，轴的偏移量必须跟着重算 ——
+   （46px 章 + left:23px 的轴；窄屏改 36px 章 → 轴移到 18px，首末两行的起止也各是 18px）
+   漏改这两个数，轴就会与阶章错开半个章身。 */
+@media(max-width:720px){
+  .axis-node{grid-template-columns:36px 1fr;gap:14px;padding:13px 0}
+  .axis-node::before{left:18px}
+  .axis-node:first-child::before{top:18px}
+  .axis-node.is-last::before{height:18px}
+  .axis-rank{width:36px;height:36px;font-size:12px}
+  .axis[data-序列="真丹道"] .axis-rank{font-size:11px}
+  .axis-name{font-size:18px}
+  .axis-quote{font-size:13.5px}
+}
+
+/* —— 神仙谱系树（神仙部）——
+   两级：层（三清/四御/职能部）→ 司（雷/斗/兵/冥/山水）。
+   层级靠三样东西读出来，全用线，不用缩进堆白：
+     层头   = 朱砂竖线
+     司     = 墨色竖线（一级连线）
+     叶子   = 宣纸小卡（与异兽部的卡片同一套纸感，好让五部看起来是一个站） */
+.tree{margin-top:4px}
+.tree-tier{padding:16px 0 6px}
+.tree-tier + .tree-tier{border-top:1px solid var(--hairline)}
+.tree-tier-head{
+  position:relative;
+  margin:0 0 14px;padding-left:15px;
+  font-family:var(--serif);font-weight:400;
+  font-size:16px;letter-spacing:var(--track-mid);color:var(--ink);
+}
+.tree-tier-head::before{
+  content:"";position:absolute;left:0;top:.1em;bottom:.1em;
+  width:2px;background:var(--cinnabar);
+}
+.tree-leaves{
+  list-style:none;margin:0;padding:0 0 0 4px;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:10px;
+}
+.tree-sects{display:grid;gap:16px}
+.tree-sect{position:relative;padding-left:18px}
+.tree-sect::before{
+  content:"";position:absolute;left:0;top:3px;bottom:3px;
+  width:1px;background:var(--rule);      /* 一级连线：把五个司挂在同一根脉上 */
+}
+.tree-sect-head{
+  margin:0 0 9px;
+  font-family:var(--serif);font-weight:400;
+  font-size:13.5px;letter-spacing:var(--track-mid);color:var(--ink-2);
+}
+.tree-leaf{
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  padding:10px 13px;
+  cursor:pointer;
+  transition:border-color .16s var(--ease);
+}
+.tree-leaf:hover{border-color:var(--ink-2)}
+.tree-leaf:hover .tree-name{color:var(--cinnabar)}
+.tree-leaf:focus-visible{outline:2px solid var(--cinnabar);outline-offset:2px}
+.tree-name{
+  margin:0;font-family:var(--serif);font-weight:400;
+  font-size:17px;letter-spacing:.08em;color:var(--ink);
+}
+.tree-name::before{
+  content:"";display:inline-block;
+  width:5px;height:5px;background:var(--cinnabar);
+  margin-right:9px;vertical-align:.2em;
+}
+.tree-alias{margin:5px 0 0;font-size:12px;color:var(--ink-2);letter-spacing:.04em}
+.tree-src{margin:6px 0 0;font-size:11.5px;color:var(--ink-2);letter-spacing:.06em}
+
+/* —— 神话时间轴（神话部）——
+   六段（创世/始祖/洪水/战争/发明/斗争），段内按 `序` 排出先后。
+   ⚠️ 段间**不是**绝对年代：只画「段内有序」的竖轴，不画一根代表年代的横轴 ——
+      洪水与战争谁在前，各家说法不一，画了等于替学界下结论（见 timeline.js 顶部注释）。 */
+.timeline{margin-top:4px}
+.tl-era{padding:10px 0 14px}
+.tl-era + .tl-era{border-top:1px solid var(--hairline)}
+.tl-era-head{
+  display:flex;align-items:center;gap:12px;
+  margin:0 0 12px;
+  font-family:var(--serif);font-weight:400;
+  font-size:16px;letter-spacing:var(--track-mid);color:var(--ink);
+}
+/* 段号用空心方框 —— 与境界部「品第」实印区分：这里是段序，不是等级 */
+.tl-era-n{
+  flex:none;
+  width:26px;height:26px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--cinnabar);color:var(--cinnabar);
+  font-size:12.5px;letter-spacing:0;
+}
+.tl-items{list-style:none;margin:0;padding:0 0 0 2px}
+.tl-item{
+  position:relative;
+  display:grid;grid-template-columns:15px 1fr;gap:14px;
+  padding:12px 0;
+  cursor:pointer;
+}
+.tl-item::before{
+  content:"";position:absolute;left:7px;top:0;bottom:0;
+  width:1px;background:var(--rule);z-index:0;
+}
+.tl-item:first-child::before{top:20px}          /* 从第一颗刻度起 */
+.tl-item.is-last::before{bottom:auto;height:20px} /* 到末颗刻度止 */
+.tl-dot{
+  position:relative;z-index:1;
+  width:9px;height:9px;margin-top:4px;
+  background:var(--cinnabar);   /* 刻度是方点，不是圆点 —— 全站禁圆角 */
+}
+.tl-body{min-width:0}
+.tl-name{
+  margin:0;font-family:var(--serif);font-weight:400;
+  font-size:18px;letter-spacing:.08em;color:var(--ink);
+}
+/* 段内序号：写进 DOM 而不是 CSS 计数器 —— 断言看得见，读屏也读得到 */
+.tl-n{
+  display:inline-block;
+  font-family:var(--sans);
+  font-size:12px;letter-spacing:0;
+  color:var(--ink-2);opacity:.75;
+  margin-right:9px;
+}
+.tl-item:hover .tl-name{color:var(--cinnabar)}
+.tl-item:focus-visible{outline:2px solid var(--cinnabar);outline-offset:2px}
+.tl-alias{margin:5px 0 0;font-size:12.5px;color:var(--ink-2);letter-spacing:.04em}
+.tl-quote{
+  margin:8px 0 0;
+  font-family:var(--serif);
+  font-size:14px;line-height:1.95;color:var(--ink-2);
+  border-left:2px solid var(--cinnabar);padding-left:11px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.tl-src{margin:8px 0 0;font-size:12px;color:var(--ink-2);letter-spacing:.08em}
+.tl-src::before{content:"出处";margin-right:7px;color:var(--cinnabar);letter-spacing:.16em}
+
+/* —— 妖怪六类分组（妖怪部）——
+   六类各自一组，组头给一句界定（来自 JSON 顶层 `形类释义`）；
+   组下是卡片列，末尾接一条「妖怪史分期」横排年表。 */
+.groups{margin-top:4px;display:grid;gap:26px}
+.grp-head{
+  display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;
+  margin:0 0 12px;padding-bottom:9px;
+  border-bottom:1px solid var(--hairline);
+}
+.grp-class{
+  position:relative;padding-left:16px;
+  font-family:var(--serif);font-size:22px;letter-spacing:.16em;color:var(--ink);
+}
+.grp-class::before{
+  content:"";position:absolute;left:0;top:.14em;bottom:.14em;
+  width:2px;background:var(--cinnabar);
+}
+.grp-gloss{font-size:12.5px;color:var(--ink-2);letter-spacing:.04em}
+.grp-list{
+  list-style:none;margin:0;padding:0;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(274px,1fr));gap:12px;
+}
+.grp-item{
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  padding:12px 14px;
+  cursor:pointer;
+  transition:border-color .16s var(--ease);
+}
+.grp-item:hover{border-color:var(--ink-2)}
+.grp-item:hover .grp-name{color:var(--cinnabar)}
+.grp-item:focus-visible{outline:2px solid var(--cinnabar);outline-offset:2px}
+.grp-name{
+  margin:0;font-family:var(--serif);font-weight:400;
+  font-size:17px;letter-spacing:.08em;color:var(--ink);
+}
+.grp-name::before{
+  content:"";display:inline-block;
+  width:5px;height:5px;background:var(--cinnabar);
+  margin-right:9px;vertical-align:.2em;
+}
+.grp-alias{margin:5px 0 0;font-size:12px;color:var(--ink-2);letter-spacing:.04em}
+.grp-quote{
+  margin:8px 0 0;
+  font-family:var(--serif);
+  font-size:13.5px;line-height:1.9;color:var(--ink-2);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.grp-src{margin:7px 0 0;font-size:11.5px;color:var(--ink-2);letter-spacing:.06em}
+
+/* 妖怪史分期：横排四段（先秦/汉魏六朝/唐/明清），每段头顶一条墨线当「时间条」 */
+.grp-chronicle{margin-top:8px;padding-top:20px;border-top:1px solid var(--rule)}
+.grp-chronicle-head{
+  position:relative;
+  margin:0 0 16px;padding-left:15px;
+  font-family:var(--serif);font-weight:400;
+  font-size:16px;letter-spacing:var(--track-mid);color:var(--ink);
+}
+.grp-chronicle-head::before{
+  content:"";position:absolute;left:0;top:.1em;bottom:.1em;
+  width:2px;background:var(--cinnabar);
+}
+.chr-items{
+  list-style:none;margin:0;padding:0;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(206px,1fr));gap:16px;
+}
+.chr-item{border-top:1px solid var(--ink);padding-top:10px}
+.chr-name{
+  margin:0;font-family:var(--serif);font-weight:400;
+  font-size:16px;letter-spacing:.12em;color:var(--ink);
+}
+.chr-text{margin:8px 0 0;font-size:12.5px;line-height:1.9;color:var(--ink-2)}
+.chr-src{margin:8px 0 0;font-size:11.5px;color:var(--ink-2);letter-spacing:.06em}
+
+/* —— 检索结果（全站检索，五部共用一个形态）——
+   为什么不做成异兽部那种图鉴卡：M6 起一次检索可能同时命中五部，
+   非异兽条目没有形象图，一列空白画心会把结果页毁掉；而且五部各有各的卡片语言。
+   所以结果区统一成「一行一条 + 一枚部角标」，角标用墨底竖排字 ——
+   与朱砂印章（标吉凶）刻意区分开：朱砂标「凶吉」，墨标「出身」。 */
+.result-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.result-item{
+  display:grid;grid-template-columns:auto 1fr;gap:16px;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  padding:14px 16px;
+  cursor:pointer;
+  transition:border-color .16s var(--ease);
+}
+.result-item:hover{border-color:var(--ink-2)}
+.result-item:hover .result-name{color:var(--cinnabar)}
+.result-item:focus-visible{outline:2px solid var(--cinnabar);outline-offset:2px}
+.result-bu{
+  align-self:start;
+  writing-mode:vertical-rl;
+  font-family:var(--serif);font-size:12px;letter-spacing:.16em;
+  color:var(--paper);background:var(--ink);
+  padding:7px 4px;
+}
+.result-body{min-width:0}
+.result-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:12px}
+.result-name{
+  margin:0;font-family:var(--serif);font-weight:400;
+  font-size:20px;letter-spacing:.1em;color:var(--ink);
+}
+.result-name::before{
+  content:"";display:inline-block;
+  width:6px;height:6px;background:var(--cinnabar);
+  margin-right:10px;vertical-align:.2em;
+}
+.result-mark{
+  font-family:var(--serif);font-size:11.5px;letter-spacing:.16em;
+  color:var(--cinnabar);border:1px solid var(--cinnabar);padding:1px 6px;
+}
+.result-alias{margin:7px 0 0;font-size:12.5px;color:var(--ink-2);letter-spacing:.04em}
+.result-quote{
+  margin:9px 0 0;
+  font-family:var(--serif);
+  font-size:14px;line-height:1.95;color:var(--ink-2);
+  border-left:2px solid var(--cinnabar);padding-left:11px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.result-src{margin:8px 0 0;font-size:12px;color:var(--ink-2);letter-spacing:.08em}
+.result-src::before{content:"出处";margin-right:7px;color:var(--cinnabar);letter-spacing:.16em}
+
+/* —— 手机宽度：四种形态一律落成单列 ——
+   时间轴的刻度偏移量随行内 padding 变，`::before` 的起止值必须跟着改（与竖轴同一条教训）。 */
+@media(max-width:720px){
+  .tree-leaves{grid-template-columns:1fr;padding-left:2px}
+  .tree-sect{padding-left:14px}
+  .tl-item{grid-template-columns:13px 1fr;gap:11px;padding:11px 0}
+  .tl-item::before{left:6px}
+  .tl-item:first-child::before{top:18px}
+  .tl-item.is-last::before{height:18px}
+  .tl-dot{width:8px;height:8px}
+  .tl-name{font-size:17px}
+  .grp-list{grid-template-columns:1fr}
+  .chr-items{grid-template-columns:1fr;gap:14px}
+  .result-item{grid-template-columns:auto 1fr;gap:12px;padding:13px}
+  .result-name{font-size:18px}
 }

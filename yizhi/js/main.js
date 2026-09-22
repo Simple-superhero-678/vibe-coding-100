@@ -2,20 +2,32 @@
 // 职责：启动、装配、绑定事件。数据从哪来、视图怎么画、怎么搜，都不该长在这个文件里。
 //
 // 与模块接口契约（TECH_DESIGN §6.2）的对应：
-//   data.loadBu       → js/data.js           （第 3 步起）
-//   views.renderGrid  → js/views/grid.js     （第 4 步起）
-//   search.buildIndex / query → js/search.js （第 5 步起）
-//   吉凶筛选条        → 本文件               （第 6 步起；见下方说明）
-//   store.*           → js/store.js          （M4 第 7 步）
-//   transit.play      → js/transit.js        （M4 第 8 步）
-//   views.renderDetail / renderFavList → js/views/detail.js / fav.js（M4 第 8 步）
+//   data.读包 / loadBu  → js/data.js            （M6 起 读包 拿整包，含部专属顶层字段）
+//   views.renderGrid    → js/views/grid.js      （第 4 步起 · 异兽部）
+//   views.renderTree    → js/views/tree.js      （M6 · 神仙部）
+//   views.renderTimeline→ js/views/timeline.js  （M6 · 神话部）
+//   views.renderGroups  → js/views/groups.js    （M6 · 妖怪部）
+//   views.renderAxis    → js/views/axis.js      （M5 · 境界部）
+//   views.renderResults → js/views/result.js    （M6 · 全站检索结果）
+//   search.buildIndex / query → js/search.js
+//   部工具条（吉凶筛选 / 序列开关）→ 本文件
+//   store.* / transit.play / views.renderDetail / renderFavList
 //
 // 为什么筛选条不放 grid.js：契约强制 renderGrid 只吃 (容器, 条目[], 筛选态)，
 // 而筛选条是「控件」—— 跟五部 tab、搜索框同类，是装配层的事。
-// grid.js 只留谓词（通过筛选），把「按钮长什么样、点了算选中还是取消、空了给什么出口」留给这里。
+//
+// M6 的这次重写只干一件事：把「异兽志」这个单部页面变成「五部站」。
+// 靠的是下面那张 部形态 表 —— 装配逻辑不认得「神仙」「境界」这些字，
+// 只认得表里的四件事：用哪个视图画 / 台子挂什么 class / 工具条装什么 / 视图要什么额外参数。
+// 再加一部（如 M6 之后的六部）只需往表里加一行。
 
-import { loadBu, 吉凶枚举 } from './data.js';
+import { 读包, 吉凶枚举, 部ofId } from './data.js';
 import { renderGrid, 图源 } from './views/grid.js';
+import { renderTree } from './views/tree.js';
+import { renderTimeline } from './views/timeline.js';
+import { renderGroups } from './views/groups.js';
+import { renderAxis } from './views/axis.js';
+import { renderResults } from './views/result.js';
 import { renderDetail, 设收藏态, 写提示 } from './views/detail.js';
 import { renderFavList } from './views/fav.js';
 import { buildIndex, query } from './search.js';
@@ -23,36 +35,52 @@ import * as store from './store.js';
 import { play as 播转场 } from './transit.js';
 import { 打开请求, 关闭请求, 收藏切换, 导出请求 } from './events.js';
 
-/* —— 状态 ——
-   两个集合刻意分开：
-     条目 = 当前部的全量，只在载入时变；
-     基准 = 当前搜索命中的那几条；没搜索时就是条目。筛选叠在基准之上。
-   分开的好处是「清空搜索」不用重新读文件，「改筛选」也不用重新搜。 */
-const 当前部 = '异兽';
-let 条目 = [];
-let 基准 = [];
-let 索引 = null;               // 数据到位后由 buildIndex 建好；未就绪时搜索框不假装能搜
-const 选中吉凶 = new Set();    // 空集合 = 不筛。同维度多值可叠，不做多条件组合面板（PRD 8.2 边界）
+/* ══════════════════════════════════════════════════════════════════════
+   状态
+   ══════════════════════════════════════════════════════════════════════ */
 
-const 网格 = document.getElementById('图鉴网格');
+const 五部 = ['神仙', '神话', '异兽', '妖怪', '境界'];
+
+/* —— 部形态表：全站唯一的「哪部长什么样」的地方 ——
+   台 = 视图台挂的 class（.grid 带乌丝栏的网格底 / .stage 素底）
+   工具 = 部内工具条装什么：'吉凶'（异兽）| '序列'（境界）| null（其余三部）
+   参数 = 交给视图的额外实参（契约里各视图的第三参数） */
+const 部形态 = {
+  神仙: { 视图: renderTree, 台: 'stage', 工具: null },
+  神话: { 视图: renderTimeline, 台: 'stage', 工具: null },
+  异兽: { 视图: renderGrid, 台: 'grid', 工具: '吉凶' },
+  妖怪: {
+    视图: renderGroups,
+    台: 'stage',
+    工具: null,
+    /* 妖怪部的附注（形类释义 + 年表）在 JSON 顶层，不在条目里，所以要从整包取 */
+    参数: () => [{ 形类释义: 当前包 && 当前包.形类释义, 年表: 当前包 && 当前包.年表 }],
+  },
+  境界: { 视图: renderAxis, 台: 'stage', 工具: '序列', 参数: () => [当前序列] },
+};
+
+let 当前部 = '异兽';
+let 当前包 = null;             // 当前部的整包（含部专属顶层字段）
+const 包缓存 = new Map();      // 部 → 整包（按需加载，切回来不再重读）
+const 条目表 = new Map();      // id → 条目（**全站**，收藏与检索跨部捞取靠它）
+
+let 基准 = [];                 // 当前部要显示的条目（部内浏览时 = 当前包.条目）
+let 全站索引 = null;           // 首次检索时建（TECH_DESIGN §6.2 loadAll 的用途）
+let 建索引中 = null;           // 建索引的进行中 Promise，防止连打字连着建五份
+let 检索中 = false;            // 结果区当前显示的是检索结果还是部内浏览
+
+const 选中吉凶 = new Set();    // 空集合 = 不筛。同维度多值可叠（或），不做多条件组合面板（PRD 8.2 边界）
+let 当前序列 = '网文';         // 境界部当前序列：'网文' | '真丹道'
+
+const 视图台 = document.getElementById('视图台');
 const 搜索框 = document.getElementById('搜索框');
-const 筛选条 = document.getElementById('吉凶筛选');
+const 部工具 = document.getElementById('部工具');
 const 筛选钮 = new Map();      // 值 → 按钮（键 '__全部' 是复位位）。留着是为了「只同步、不重建」
-let 上次基准签名 = null;       // 基准没变就不重建按钮 —— 否则在搜索框每敲一个字，整条筛选栏都会闪一下
 
-/* E 部境界无 `吉凶` 字段（TECH_DESIGN §5.2），切到那部时整条筛选隐藏 */
-const 部有吉凶 = 当前部 !== '境界';
+/* ══════════════════════════════════════════════════════════════════════
+   小工具
+   ══════════════════════════════════════════════════════════════════════ */
 
-/* —— 五部 tab 的就绪状态：只有异兽部有数据，其余 M6 补 —— */
-const 五部 = [
-  { 名: '神仙', 就绪: false },
-  { 名: '神话', 就绪: false },
-  { 名: '异兽', 就绪: true },
-  { 名: '妖怪', 就绪: false },
-  { 名: '境界', 就绪: false },
-];
-
-/* —— 小工具 —— */
 function 建行(类名, 文本) {
   const 节点 = document.createElement('p');
   节点.className = 类名;
@@ -74,54 +102,114 @@ function 建动作钮(文字, 点击) {
   return 钮;
 }
 
-/* —— 渲染：五部 tab —— */
+function 设台(类名) {
+  视图台.className = 类名;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   数据：按需加载
+   ══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 取一部的整包。已读过的直接给缓存 —— 切部来回切不重复读文件。
+ * 顺手把条目灌进 条目表：收藏与检索要在**全站**范围内按 id 捞条目。
+ */
+async function 取包(部名) {
+  if (包缓存.has(部名)) return 包缓存.get(部名);
+
+  const 包 = await 读包(部名);
+  包缓存.set(部名, 包);
+  包.条目.forEach(条 => 条目表.set(条.id, 条));
+  return 包;
+}
+
+/** 按 id 拿一条；当前没载入那部就去载它（收藏夹里可能是任意一部的东西） */
+async function 确保条目(id) {
+  if (条目表.has(id)) return 条目表.get(id);
+  const 部 = 部ofId(id);
+  if (部) {
+    try { await 取包(部); } catch (错) { console.warn('[异兽志] 为取条目而载入某部失败：', 部, 错); }
+  }
+  return 条目表.get(id) || null;
+}
+
+/** 建全站索引（只建一次）。并发的调用共享同一个进行中的 Promise。 */
+function 建全站索引() {
+  if (全站索引) return Promise.resolve(全站索引);
+  if (建索引中) return 建索引中;
+
+  建索引中 = Promise.allSettled(五部.map(取包)).then(结果 => {
+    const 全部 = [];
+    结果.forEach((项, 序) => {
+      if (项.status === 'fulfilled') 全部.push(...项.value.条目);
+      else console.warn('[异兽志] 建索引时跳过一部：', 五部[序], 项.reason);
+    });
+    if (全部.length) 全站索引 = buildIndex(全部);
+    建索引中 = null;
+    return 全站索引;
+  });
+
+  return 建索引中;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   渲染：五部 tab
+   ══════════════════════════════════════════════════════════════════════ */
+
 function 渲染部Tab() {
   const 容器 = document.getElementById('部tabs');
   容器.textContent = '';
-  五部.forEach(部 => {
+  五部.forEach(名 => {
     const 钮 = document.createElement('button');
     钮.type = 'button';
     钮.className = 'bu';
-    钮.textContent = 部.名;
-    if (部.就绪) {
-      钮.setAttribute('aria-current', 部.名 === 当前部 ? 'true' : 'false');
-    } else {
-      钮.disabled = true;   // 数据未录入：置灰不可点，不写「敬请期待」这类占位文字（PRD 8.6）
-    }
+    钮.textContent = 名;
+    钮.setAttribute('aria-current', 名 === 当前部 ? 'true' : 'false');
+    钮.addEventListener('click', () => 切部(名));
     容器.append(钮);
   });
 }
 
-/* —— 渲染：吉凶筛选条（F2，PRD 8.2） ——
-   条数标在按钮上，是为了让人「点之前」就看见点下去有没有东西。
-   徽标基于「基准」而不是全量：搜完再筛时数目才对得上（否则会显示整部的分布，点下去数字不符）。 */
-function 渲染筛选条() {
-  if (!部有吉凶) { 筛选条.hidden = true; return; }
-  筛选条.hidden = false;
+/* ══════════════════════════════════════════════════════════════════════
+   渲染：部工具条（异兽 = 吉凶筛选 / 境界 = 序列开关 / 其余 = 隐藏）
+   ══════════════════════════════════════════════════════════════════════ */
 
-  /* 基准没变就只同步选中态，不重建 DOM —— 否则输入关键词时筛选栏会逐字闪 */
-  const 签名 = 基准.map(条 => 条.id + ':' + 条.吉凶).join('|');
-  if (签名 === 上次基准签名 && 筛选钮.size) { 同步筛选条(); return; }
-  上次基准签名 = 签名;
+function 渲染部工具() {
+  const 工具 = 部形态[当前部].工具;
 
-  筛选条.textContent = '';
+  部工具.textContent = '';
   筛选钮.clear();
+  /* 重建时机只有三个：换部、换序列、进出检索 —— 都不在「每敲一个字」的路径上，
+     所以不需要以前那套「基准签名没变就不重建」的防闪保护了。 */
 
+  /* 检索结果是跨部的，部内工具在那种上下文里没有对象 —— 整条收起，
+     不留一个「点了不知道筛什么」的控件（与零结果时收起筛选条同一条理由）。 */
+  if (检索中 || !工具) { 部工具.hidden = true; return; }
+  部工具.hidden = false;
+
+  if (工具 === '吉凶') return 渲染筛选条();
+  if (工具 === '序列') return 渲染序列开关();
+}
+
+/* —— 异兽部的吉凶筛选（F2，PRD 8.2）——
+   条数标在按钮上，是为了让人「点之前」就看见点下去有没有东西。
+   徽标基于「基准」而不是全量：筛完再看的数目才对得上（否则会显示整部的分布，点下去数字不符）。 */
+function 渲染筛选条() {
   const 标签 = document.createElement('span');
   标签.className = 'filter-label';
   标签.textContent = '吉凶';
-  筛选条.append(标签);
+  部工具.append(标签);
 
   /* 「全部」放最前：它是复位位，不是第五个分类值，所以不计弱化、条数取基准全量 */
   const 全部钮 = 建筛选钮('全部', 基准.length, false);
   全部钮.addEventListener('click', () => { 选中吉凶.clear(); 应用筛选(); });
   筛选钮.set('__全部', 全部钮);
-  筛选条.append(全部钮);
+  部工具.append(全部钮);
 
   const 隔 = document.createElement('span');
   隔.className = 'chip-sep';
   隔.setAttribute('aria-hidden', 'true');
-  筛选条.append(隔);
+  部工具.append(隔);
 
   吉凶枚举.forEach(值 => {
     const 数 = 基准.filter(条 => 条.吉凶 === 值).length;
@@ -132,10 +220,40 @@ function 渲染筛选条() {
       应用筛选();
     });
     筛选钮.set(值, 钮);
-    筛选条.append(钮);
+    部工具.append(钮);
   });
 
   同步筛选条();
+}
+
+/* —— 境界部的双序列开关（PRD §4 的「杀手细节」）——
+   两套序列并排一个开关，点一下就换。副题与说明来自 JSON 顶层（`序列`），
+   不写在这里 —— 它们是内容（谁出的、什么性质），内容归 JSON（§12.2）。 */
+function 渲染序列开关() {
+  const 标签 = document.createElement('span');
+  标签.className = 'filter-label';
+  标签.textContent = '序列';
+  部工具.append(标签);
+
+  const 序们 = (当前包 && 当前包.序列) || [];
+  序们.forEach(项 => {
+    const 钮 = 建筛选钮(项.名, null, false);   // null 条数 = 不挂徽标
+    钮.title = 项.副题 || '';
+    钮.addEventListener('click', () => 切序列(项.名));
+    筛选钮.set(项.名, 钮);
+    部工具.append(钮);
+  });
+
+  同步序列开关();
+
+  /* 副题 + 说明单起一行，占满整条：这两句正是「两套序列差在哪」的答案，不能省 */
+  const 选中 = 序们.find(项 => 项.名 === 当前序列) || 序们[0];
+  if (选中) {
+    const 注 = document.createElement('p');
+    注.className = 'filter-note';
+    注.textContent = [选中.副题, 选中.说明].filter(Boolean).join(' · ');
+    部工具.append(注);
+  }
 }
 
 function 建筛选钮(文字, 条数, 弱化) {
@@ -145,38 +263,51 @@ function 建筛选钮(文字, 条数, 弱化) {
   钮.textContent = 文字;                 // 一律 textContent，条目内容不进 innerHTML
   if (弱化) 钮.dataset.空 = '1';          // 当前 0 条：只弱化不禁用，点了给出口
 
-  const 标 = document.createElement('span');
-  标.className = 'chip-n';
-  标.textContent = String(条数);
-  钮.append(标);
+  if (条数 != null) {                    // 序列开关没有条数概念，不挂徽标
+    const 标 = document.createElement('span');
+    标.className = 'chip-n';
+    标.textContent = String(条数);
+    钮.append(标);
+  }
 
   return 钮;
 }
 
 function 同步筛选条() {
   筛选钮.forEach((钮, 键) => {
-    const 选中 = 键 === '__全部' ? 选中吉凶.size === 0 : 选中吉凶.has(键);
-    钮.setAttribute('aria-pressed', 选中 ? 'true' : 'false');
+    if (键 === '__全部') { 钮.setAttribute('aria-pressed', 选中吉凶.size === 0 ? 'true' : 'false'); return; }
+    钮.setAttribute('aria-pressed', 选中吉凶.has(键) ? 'true' : 'false');
   });
 }
 
-/* —— 筛选 → 渲染 —— */
+function 同步序列开关() {
+  筛选钮.forEach((钮, 键) => 钮.setAttribute('aria-pressed', 键 === 当前序列 ? 'true' : 'false'));
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   铺台子：部内浏览
+   ══════════════════════════════════════════════════════════════════════ */
+
 function 当前筛选态() {
   return 选中吉凶.size ? { 吉凶: [...选中吉凶] } : null;
 }
 
 function 应用筛选() {
   同步筛选条();
-  铺网格();
+  铺当前部();
 }
 
-/* 铺网格：搜索与筛选的唯一出口。
-   两者都只是改「基准」和「选中吉凶」，最后都走到这里，站况与出口逻辑因此只有一份。 */
-function 铺网格() {
-  const 条数 = renderGrid(网格, 基准, 当前筛选态());
+/* 铺台子：部内浏览的唯一出口。
+   换部、改筛选、清检索最后都走到这里，站况与空态出口因此只有一份。 */
+function 铺当前部() {
+  const 形态 = 部形态[当前部];
+  设台(形态.台);
 
-  /* 基准非空却零条 = 被筛选滤空了，不是没数据。给出口，不给死胡同（PRD 9.2 ②） */
-  if (!条数 && 基准.length) return 渲染筛空();
+  const 额外 = 形态.参数 ? 形态.参数() : [];
+  const 条数 = 形态.视图(视图台, 基准, ...额外);
+
+  /* 异兽部：基准非空却零条 = 被筛选滤空了，不是没数据。给出口，不给死胡同（PRD 9.2 ②） */
+  if (当前部 === '异兽' && !条数 && 基准.length) return 渲染筛空();
 
   写站况数(条数);
 }
@@ -188,15 +319,20 @@ function 筛选说法() {
 }
 
 function 写站况数(条数) {
-  const 词 = 搜索框.value.trim();
-  const 动作 = [词 ? `搜「${词}」` : '', 选中吉凶.size ? 筛选说法() : '']
-    .filter(Boolean).join(' + ');
-  写站况(动作 ? `${当前部}部 · ${动作} · ${条数} 条` : `${当前部}部 · ${条数} 条`);
+  if (检索中) {
+    写站况(`全站 · 搜「${搜索框.value.trim()}」 · ${条数} 条`);
+    return;
+  }
+
+  /* 境界部把当前序列也写进站况：这一部「看的是哪套序列」是状态，不写出来就看不见 */
+  const 序列词 = 部形态[当前部].工具 === '序列' && 当前序列 ? ` · ${当前序列}` : '';
+  const 筛选词 = 选中吉凶.size ? ` · ${筛选说法()}` : '';
+  写站况(`${当前部}部${序列词}${筛选词} · ${条数} 条`);
 }
 
 /* 筛选滤空的面板 —— 复用零结果的语言：这两块都是「出了状况，但有出路」 */
 function 渲染筛空() {
-  网格.textContent = '';
+  视图台.textContent = '';
 
   const 块 = document.createElement('div');
   块.className = 'zero';
@@ -207,30 +343,142 @@ function 渲染筛空() {
     应用筛选();
   }));
 
-  网格.append(块);
+  视图台.append(块);
   写站况(`${当前部}部 · 筛选无结果`);
 }
 
 /* —— 数据没读到时的出路：一句人话 + 一个能点的按钮（TECH_DESIGN §9-1，不白屏、不弹 alert） —— */
 function 渲染加载失败(错) {
-  网格.textContent = '';
-  筛选条.hidden = true;   // 条目都没读到，筛选条没有意义
+  设台(部形态[当前部].台);
+  视图台.textContent = '';
+  部工具.hidden = true;
 
   const 块 = document.createElement('div');
   块.className = 'load-fail';
   块.append(建行('load-fail-msg', `${(错 && 错.部名) || 当前部}部数据没读到。`));
   if (错 && 错.原因) 块.append(建行('load-fail-why', `原因：${错.原因}`));
-  块.append(建动作钮('重试', 载入));
+  块.append(建动作钮('重试', () => 切部(当前部)));
 
-  网格.append(块);
+  视图台.append(块);
   写站况(`${当前部}部 · 未读到数据`);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   切部 / 切序列 / 检索
+   ══════════════════════════════════════════════════════════════════════ */
+
+async function 切部(名) {
+  if (!五部.includes(名)) return;
+
+  当前部 = 名;
+  检索中 = false;
+  搜索框.value = '';          // 换部时检索结果已无意义，一起清掉
+  选中吉凶.clear();
+
+  渲染部Tab();
+  设台(部形态[名].台);
+  视图台.textContent = '';
+  部工具.hidden = true;
+  写站况(`${名}部 · 读取中`);
+
+  try {
+    当前包 = await 取包(名);
+  } catch (错) {
+    当前包 = null;
+    基准 = [];
+    return 渲染加载失败(错);
+  }
+
+  基准 = 当前包.条目;
+
+  /* 境界部：数据里没有当前选中的那套序列时，回到里头的第一套 ——
+     否则会画出一根空轴，而那看起来像「这部没内容」。 */
+  if (部形态[名].工具 === '序列') {
+    const 名们 = (当前包.序列 || []).map(项 => 项.名);
+    if (!名们.includes(当前序列)) 当前序列 = 名们[0] || '';
+  }
+
+  渲染部工具();
+  铺当前部();
+}
+
+function 切序列(名) {
+  if (名 === 当前序列) return;
+  当前序列 = 名;
+  渲染部工具();
+  铺当前部();
+}
+
+/* 检索（F1）——
+   M6 起是**全站检索**：五部一起搜。理由有两条，都是硬的：
+     ① PRD 8.1 要求「输入'九尾狐'结果不止一条」——只搜异兽部永远只有一条；
+     ② 别称本来就不受书籍限制（PRD §4 硬约束 2）：「妲己」指九尾狐，「九尾狐」也该指到妖怪部的狐妖。
+   所以结果区换成统一的「列表」形态（views/result.js），并收起部内工具条。 */
+async function 执行搜索(输入) {
+  const 关键词 = String(输入 == null ? '' : 输入).trim();
+
+  if (!关键词) {
+    退出检索();
+    return;
+  }
+
+  /* 数据还没备齐就先报「读取中」，不假装能搜、也不给死胡同 */
+  if (!全站索引) {
+    设台('stage');
+    部工具.hidden = true;
+    视图台.textContent = '';
+    const 块 = document.createElement('div');
+    块.className = 'zero';
+    块.append(建行('zero-msg', '数据还在读，稍等一下再搜。'));
+    视图台.append(块);
+    写站况('全站 · 读取中');
+
+    await 建全站索引();
+    /* 等完再按当前输入重来一次：期间用户可能又打了字 */
+    if (搜索框.value.trim() !== 关键词) return;
+    if (!全站索引) { 渲染全站读不到(); return; }
+  }
+
+  const 结果 = query(全站索引, 关键词);
+  检索中 = true;
+  部工具.hidden = true;
+
+  if (结果.直接命中.length) {
+    设台('stage');
+    renderResults(视图台, 结果.直接命中);
+    写站况数(结果.直接命中.length);
+    return;
+  }
+
+  渲染零结果(结果.相近, 关键词);
+}
+
+/* 五部全没读到才可能走到这里 —— 逐部失败已经在控制台记过，这里只给用户一句人话 */
+function 渲染全站读不到() {
+  设台('stage');
+  视图台.textContent = '';
+  const 块 = document.createElement('div');
+  块.className = 'load-fail';
+  块.append(建行('load-fail-msg', '五部数据都没读到，检索暂时不能用。'));
+  块.append(建动作钮('重试', () => 切部(当前部)));
+  视图台.append(块);
+  写站况('全站 · 未读到数据');
+}
+
+function 退出检索() {
+  检索中 = false;
+  搜索框.value = '';
+  基准 = 当前包 ? 当前包.条目 : [];
+  渲染部工具();
+  铺当前部();
 }
 
 /* —— 零结果不给死胡同（PRD 9.2 ② / TECH_DESIGN §9-9）：
      明说没找到 → 给相近条目（点了就换成它去搜）→ 再给「清空」这一步退路。 —— */
 function 渲染零结果(相近, 关键词) {
-  网格.textContent = '';
-  筛选条.hidden = true;   // 当前显示的是提示面板而不是条目列表，筛选条留着会自相矛盾
+  设台('stage');
+  视图台.textContent = '';
+  部工具.hidden = true;
 
   const 块 = document.createElement('div');
   块.className = 'zero';
@@ -244,7 +492,8 @@ function 渲染零结果(相近, 关键词) {
       const 钮 = document.createElement('button');
       钮.type = 'button';
       钮.className = 'near';
-      钮.textContent = 条.名;
+      /* 相近条目可能来自别的部 —— 角标写清它属于哪一部，点了也才好找 */
+      钮.textContent = `${条.名}（${条.部}）`;
       钮.addEventListener('click', () => {
         搜索框.value = 条.名;
         搜索框.focus();
@@ -257,99 +506,16 @@ function 渲染零结果(相近, 关键词) {
     块.append(建行('zero-lead', '试试输入名字、俗称或小说称号（例：妲己）。'));
   }
 
-  /* 文案要跟着筛选状态走：清空搜索不会一并清筛选，别让按钮说「看全部」却只给一半 */
-  块.append(建动作钮(
-    选中吉凶.size ? '清空搜索（筛选保留）' : `清空，看全部 ${条目.length} 条`,
-    清空搜索,
-  ));
+  块.append(建动作钮(`清空，回到${当前部}部`, 清空搜索));
 
-  网格.append(块);
-  写站况(`${当前部}部 · 搜「${关键词}」无结果`);
-}
-
-/* —— 搜索 ——
-   筛选叠在搜索结果之上：先搜出范围，再在范围里按吉凶挑。这是网文作者的真实用法
-   （「找狐类，但不要凶的」）。搜索零命中时筛选条隐藏，不留下一个没对象的控件。 */
-function 执行搜索(输入) {
-  const 关键词 = String(输入 == null ? '' : 输入).trim();
-
-  if (!关键词) {                 // 空输入 = 回到整部（筛选保留）
-    基准 = 条目;
-    渲染筛选条();
-    铺网格();
-    return;
-  }
-
-  /* 数据还没读到就不假装能搜，也不给死胡同 */
-  if (!索引) {
-    网格.textContent = '';
-    筛选条.hidden = true;
-
-    const 块 = document.createElement('div');
-    块.className = 'zero';
-    块.append(建行('zero-msg', `${当前部}部数据还在读，稍等一下再搜。`));
-    块.append(建动作钮('重试', 载入));
-    网格.append(块);
-
-    写站况(`${当前部}部 · 读取中`);
-    return;
-  }
-
-  const 结果 = query(索引, 关键词);
-
-  if (结果.直接命中.length) {
-    基准 = 结果.直接命中;
-    渲染筛选条();
-    铺网格();
-    return;
-  }
-
-  渲染零结果(结果.相近, 关键词);
+  视图台.append(块);
+  写站况(`全站 · 搜「${关键词}」无结果`);
 }
 
 function 清空搜索() {
-  搜索框.value = '';
   搜索框.focus();
-  执行搜索('');
+  退出检索();
 }
-
-/* —— 启动 —— */
-async function 载入() {
-  网格.textContent = '';
-  筛选条.hidden = true;
-  写站况(`${当前部}部 · 读取中`);
-
-  try {
-    条目 = await loadBu(当前部);
-  } catch (错) {
-    条目 = [];
-    基准 = [];
-    索引 = null;
-    渲染加载失败(错);
-    return;
-  }
-
-  索引 = buildIndex(条目);
-  基准 = 条目;                  // 新数据到手 = 搜索范围归零到整部
-
-  /* 读数据时用户可能已经在搜索框里打了字：按当前输入决定铺什么，不要把搜索状态冲掉 */
-  if (搜索框.value.trim()) 执行搜索(搜索框.value);
-  else {
-    渲染筛选条();
-    铺网格();
-  }
-}
-
-/* —— 输入即响应（PRD 9.2 ②）。数据在内存里，不需要防抖，敲一个字符就重铺一次 —— */
-搜索框.addEventListener('input', () => 执行搜索(搜索框.value));
-
-/* 原生 type=search 的 Esc 只清值不重铺，这里补上「清完要回到整部列表」 */
-搜索框.addEventListener('keydown', 事件 => {
-  if (事件.key === 'Escape') {
-    事件.preventDefault();
-    清空搜索();
-  }
-});
 
 /* ══════════════════════════════════════════════════════════════════════
    M4 · 详情（F3）+ 转场（F4）+ 收藏与导出（F5）
@@ -370,29 +536,45 @@ let 当前详情 = null;      // 同时只该开着一张详情
 
 /* —— 收藏的四个落点 ——
    一次 toggle 会牵动四处：详情里的按钮、入口上的计数、收藏面板的列表、localStorage 本身。
-   所以只留这一个出口「同步收藏」，别处一律不许直接改这几个 DOM。 */
-function 收藏条目() {
+   所以只留这一个出口，别处一律不许直接改这几个 DOM。
+
+   M6 起收藏夹要跨五部捞条目：当前部载入的那一份不够用了，捞不到的按 id 前缀
+   去载它所属的那一部（只读、顺手进缓存）—— 这样「收藏了一条境界、刷新后打开收藏夹」
+   也能正常显示，而不是被误判成「已下架」（TECH_DESIGN §12.4）。 */
+async function 收藏条目() {
   const ids = store.list();
-  /* 用 id 去当前部里捞。捞不到（条目被删、或收藏的是别的部的）**不能静默消失** ——
-     收藏夹里少了东西而没有解释，比少东西本身更让人困惑。
-     给一条「已下架」的占位，并且在列表里留一个「移除」出口（TECH_DESIGN §12.4）。
-     M6 五部全通后这里要改成去全量里捞。 */
-  return ids.map(id => 条目.find(条 => 条.id === id)
-    || { id, 名: '此条已下架', 出处: '', 已下架: true });
+  if (!ids.length) return [];
+
+  await Promise.all(
+    ids.filter(id => !条目表.has(id))
+      .map(id => 部ofId(id))
+      .filter(Boolean)
+      .filter((部, 序, 全) => 全.indexOf(部) === 序)      // 同一部只载一次
+      .map(部 => 取包(部).catch(错 => console.warn('[异兽志] 收藏夹载入某部失败：', 部, 错))),
+  );
+
+  /* 捞不到（条目被删）**不能静默消失** —— 收藏夹里少了东西而没有解释，
+     比少东西本身更让人困惑。给一条「已下架」的占位，并在列表里留一个「移除」出口。 */
+  return ids.map(id => 条目表.get(id)
+    || { id, 名: '此条已下架', 部: 部ofId(id) || '', 出处: '', 已下架: true });
 }
 
 /* 导出时要把占位滤掉：占位不是内容，不该出现在导出文本里 */
-function 可导出的收藏() {
-  return 收藏条目().filter(条 => !条.已下架);
+function 可导出的收藏(收藏们) {
+  return 收藏们.filter(条 => !条.已下架);
 }
 
-function 同步收藏() {
+async function 同步收藏() {
+  const 收藏们 = await 收藏条目();
   const 条数 = store.list().length;
+
   收藏计数.textContent = String(条数);
   收藏说明.textContent = `${条数} 条`;
   if (当前详情) 设收藏态(当前详情, store.has(当前详情.dataset.id));
   /* 收藏面板开着就重画：取消收藏后那一条要立刻消失（PRD 8.5） */
-  if (收藏面板.open) renderFavList(收藏列表, 收藏条目());
+  if (收藏面板.open) renderFavList(收藏列表, 收藏们);
+
+  return 收藏们;
 }
 
 function 提示(文本) {
@@ -452,6 +634,21 @@ function 打开详情(条, { 转场 = true } = {}) {
   播转场({ onDone: 落 });
 }
 
+/* 点一行 → 开详情。行可能是网格卡、竖轴行、谱系叶、时间轴节、六类条、检索结果行 ——
+   它们的共同点是都带 data-id（M6 起统一用 data-id 委托，不再只认 .card）。 */
+async function 点开行(目标) {
+  const 行 = 目标.closest('[data-id]');
+  if (!行) return;
+  打开某id(行.dataset.id);
+}
+
+/* 按 id 开详情。收藏夹里的条目可能属于任意一部（甚至是还没载入的那部），
+   所以先经 确保条目 把数据备齐，再开。转场要在这之前播，否则会先闪出一块空白。 */
+async function 打开某id(id) {
+  const 条 = await 确保条目(id);
+  if (条) 打开详情(条);
+}
+
 /* 点背板关掉面板：<dialog> 的原生能力里没有这条（只有 Esc）。
    判断用坐标而不是 target —— dialog 自身的 padding 是 0，落在矩形内又没有子元素可命中的情况极少，
    但「点在哪」这件事用坐标说最不含糊。 */
@@ -469,25 +666,25 @@ function 挂背板关(面板, 关掉) {
    注意这里**不能**因为「条目找不到」就早退：收藏夹里那些已下架的条目，
    恰恰只有这个动作能把它们移掉（TECH_DESIGN §12.4）。
    第一版加了早退，结果「移除」按钮点了没反应 —— 探针抓到了。 */
-function 处理收藏(id) {
-  const 条 = 条目.find(项 => 项.id === id);
+async function 处理收藏(id) {
+  const 条 = await 确保条目(id);
   const 名 = 条 ? 条.名 : '这条已下架的内容';
 
   try {
     const 现在 = store.toggle(id);
-    同步收藏();
+    await 同步收藏();
     提示(现在 ? `已收藏「${名}」` : `已从收藏夹移出「${名}」`);
   } catch {
     /* 写失败（多半是 localStorage 写满）：不假装成功，也不清空已有收藏（TECH_DESIGN §9-8）。
        先把界面刷回真状态，再明说没存上。 */
-    同步收藏();
+    await 同步收藏();
     提示('没能存上：本机存储写满了，先取消几条再试。');
   }
 }
 
 /* —— 导出 —— */
 async function 处理导出({ id, 方式 }) {
-  const 条 = 条目.find(项 => 项.id === id);
+  const 条 = await 确保条目(id);
   if (!条) return;
 
   const 文 = store.exportText([条]);
@@ -502,8 +699,8 @@ async function 处理导出({ id, 方式 }) {
   提示('已下载 txt 文件。');
 }
 
-function 导出收藏夹() {
-  const 收藏 = 可导出的收藏();
+async function 导出收藏夹() {
+  const 收藏 = 可导出的收藏(await 收藏条目());
   if (!收藏.length) {
     收藏提示.textContent = '收藏夹是空的，没有可导出的内容。';
     return;
@@ -512,29 +709,36 @@ function 导出收藏夹() {
   收藏提示.textContent = `已导出 ${收藏.length} 条（含原文与出处）。`;
 }
 
-/* —— 网格上的点击（事件委托）——
-   卡片是 grid.js 建的，但「点了之后干什么」是装配层的事，所以监听挂在这里。
-   委托而不是逐张卡挂监听：重新铺一次网格（搜索、筛选）不用重新绑定。 */
-网格.addEventListener('click', 事件 => {
-  const 卡 = 事件.target.closest('.card');
-  if (!卡) return;
-  打开详情(条目.find(条 => 条.id === 卡.dataset.id));
+/* ══════════════════════════════════════════════════════════════════════
+   事件绑定
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* —— 输入即响应（PRD 9.2 ②）。数据在内存里，不需要防抖，敲一个字符就重铺一次 —— */
+搜索框.addEventListener('input', () => 执行搜索(搜索框.value));
+
+/* 原生 type=search 的 Esc 只清值不重铺，这里补上「清完要回到部内浏览」 */
+搜索框.addEventListener('keydown', 事件 => {
+  if (事件.key === 'Escape') {
+    事件.preventDefault();
+    清空搜索();
+  }
 });
 
-/* 卡片带了 role="button"，键盘也得能开（Enter / 空格），否则等于只给鼠标用 */
-网格.addEventListener('keydown', 事件 => {
+/* —— 内容区上的点击（事件委托）——
+   行是各 views 建的，但「点了之后干什么」是装配层的事，所以监听挂在这里。
+   委托而不是逐行挂监听：重新铺一次（换部、筛选、检索）不用重新绑定。 */
+视图台.addEventListener('click', 事件 => 点开行(事件.target));
+
+/* 行带了 role="button"，键盘也得能开（Enter / 空格），否则等于只给鼠标用 */
+视图台.addEventListener('keydown', 事件 => {
   if (事件.key !== 'Enter' && 事件.key !== ' ') return;
-  const 卡 = 事件.target.closest('.card');
-  if (!卡) return;
+  if (!事件.target.closest('[data-id]')) return;
   事件.preventDefault();   // 空格默认会滚动页面
-  打开详情(条目.find(条 => 条.id === 卡.dataset.id));
+  点开行(事件.target);
 });
 
 /* —— 视图层派发上来的事件，统一在 document 上收（它们都 bubbles）—— */
-document.addEventListener(打开请求, 事件 => {
-  打开详情(条目.find(条 => 条.id === 事件.detail.id));
-});
-
+document.addEventListener(打开请求, 事件 => { 打开某id(事件.detail.id); });
 document.addEventListener(关闭请求, 事件 => {
   /* 关闭请求从两个地方来：详情的「收起」按钮、收藏面板的「收起」。
      用事件源判断该关哪个 —— 把当前开着的那个关掉就行。 */
@@ -542,12 +746,12 @@ document.addEventListener(关闭请求, 事件 => {
   else 收起详情();
 });
 
-document.addEventListener(收藏切换, 事件 => 处理收藏(事件.detail.id));
-document.addEventListener(导出请求, 事件 => 处理导出(事件.detail));
+document.addEventListener(收藏切换, 事件 => { 处理收藏(事件.detail.id); });
+document.addEventListener(导出请求, 事件 => { 处理导出(事件.detail); });
 
-收藏入口.addEventListener('click', () => {
-  renderFavList(收藏列表, 收藏条目());
-  收藏说明.textContent = `${store.list().length} 条`;
+收藏入口.addEventListener('click', async () => {
+  const 收藏们 = await 同步收藏();
+  renderFavList(收藏列表, 收藏们);
   收藏提示.textContent = '';
   收藏面板.showModal();
 });
@@ -556,9 +760,12 @@ document.getElementById('关收藏').addEventListener('click', 收起收藏面�
 document.getElementById('导出收藏').addEventListener('click', 导出收藏夹);
 挂背板关(收藏面板, 收起收藏面板);
 
-/* —— 启动 —— */
+/* ══════════════════════════════════════════════════════════════════════
+   启动
+   ══════════════════════════════════════════════════════════════════════ */
+
 渲染部Tab();
-载入();
+切部('异兽');
 同步收藏();
 
 /* localStorage 不可用（隐私模式 / 被禁用）时明说一句，别让人收藏半天才发现刷新就没了（TECH_DESIGN §9-7）。
@@ -568,4 +775,4 @@ if (!store.可用()) {
   收藏说明.textContent = '本浏览器无法保存收藏，关掉页面即失效';
 }
 
-console.log('[异兽志] Day 7 · M4 已接：详情 F3 / 转场 F4 / 收藏与导出 F5 · 图源目录 %s', 图源);
+console.log('[异兽志] M6 已接：五部全通（神仙谱系树 / 神话时间轴 / 异兽图鉴 / 妖怪六类 / 境界竖轴）· 全站检索 · 图源目录 %s', 图源);

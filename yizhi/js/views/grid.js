@@ -33,7 +33,10 @@ function 建卡片(条) {
 
   const 印章 = document.createElement('span');
   印章.className = 'seal';
-  印章.textContent = 条.吉凶 || '未分类';
+  /* 印章标「吉凶」，没有吉凶的条目（E 部境界）退一步标「部」——
+     PRD 8.6 要的是「朱砂印章（方形角标，标吉凶或部类）」，两种都算数。
+     一律写成「未分类」就把这条识别特征浪费了。 */
+  印章.textContent = 条.吉凶 || 条.部 || '未分类';
   卡.append(印章);
 
   卡.append(建图(条));

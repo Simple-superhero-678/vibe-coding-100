@@ -66,7 +66,15 @@ export function renderFavList(容器, 条目) {
     源.className = 'fav-src';
     源.textContent = 已下架 ? '收藏时存的 id 已不在当前数据里' : 条.出处;
 
-    开.append(名, 源);
+    /* 部标（M6）：收藏夹是跨五部的，不写清这条从哪一部来的，翻收藏时得靠记性 */
+    if (!已下架 && 条.部) {
+      const 部标 = document.createElement('span');
+      部标.className = 'fav-bu';
+      部标.textContent = 条.部;
+      开.append(部标, 名, 源);
+    } else {
+      开.append(名, 源);
+    }
 
     /* 已下架的那条也留着「移除」：收藏夹里有个点不开又清不掉的东西，最让人难受 */
     const 撤 = document.createElement('button');

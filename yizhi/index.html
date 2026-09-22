@@ -54,12 +54,20 @@
       </div>
     </section>
 
-    <!-- 吉凶筛选（F2 · 异兽部的部内筛选入口）
-         按钮与条数由 main.js 渲染：条数标在按钮上是刻意的 —— 让「点下去有没有东西」先被看见。
-         E 部境界无 `吉凶` 字段（TECH_DESIGN §5.2），切到那部时整条隐藏。 -->
-    <nav class="filter" id="吉凶筛选" aria-label="按吉凶筛选"></nav>
+    <!-- 部工具条（F2 · 部内筛选/切换的入口）
+         原来只装吉凶筛选（异兽部），M6 起升格为**每部自己的工具条**：
+           异兽部 = 吉凶筛选（按钮与条数由 main.js 渲染）
+           境界部 = 「真丹道 / 网文」双序列开关
+           其余三部无部内工具 → 整条隐藏。
+         条数标在吉凶按钮上是刻意的 —— 让「点下去有没有东西」先被看见。
+         E 部境界无 `吉凶` 字段（TECH_DESIGN §5.2），所以它那套工具是序列开关而非筛选。 -->
+    <nav class="filter" id="部工具" aria-label="部内工具"></nav>
 
-    <section class="grid" id="图鉴网格" aria-label="图鉴网格"></section>
+    <!-- 视图台（V1/V2 的内容区）：异兽部铺图鉴网格，神仙部铺谱系树，
+         神话部铺时间轴，妖怪部铺六类分组，境界部铺竖轴，检索时铺结果列表。
+         台子本身不带样式 —— 换形态时由装配层换 class（.grid / .stage），
+         骨架由各 views/*.js 现画（M6）。 -->
+    <section class="grid" id="视图台" aria-label="内容区"></section>
 
     <span class="scroll-roller roller-bottom" aria-hidden="true"></span>
   </div>
