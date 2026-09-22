@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 884" width="680" height="884" role="img">
+<title>异兽志 MVP 结构图（Day 7）</title>
+<desc>三层结构。启动链：index.html 以 type=module 载入 js/main.js（装配层）。main.js 调用三个模块：js/data.js 负责加载与校验条目、js/search.js 负责 2-gram 倒排索引、js/views/grid.js 负责渲染卡片与图源判定。data.js 读 data/yishou.json；grid.js 取 assets 下的图片，私有图在 assets-private。未建部分为 store.js 收藏、transit.js 转场、renderDetail 详情与其余四个视图。页面区块：shell 内含 header.hero（题识、定位语、竖排题签）、div.tail 版心鱼尾、div.scroll 卷轴（含 finder 搜索与五部 tab、filter 吉凶筛选条、grid 图鉴网格）、footer.colophon 书尾；另有 div.margins 装饰层，不承载信息。</desc>
+<style>
+text{font-family:var(--font-sans,system-ui,"Microsoft YaHei",sans-serif)}
+.tt{font-size:13px;font-weight:500;fill:#1F1B18}
+.tb{font-size:13px;fill:#1F1B18}
+.ts{font-size:12px;fill:#6B6157}
+.tc{font-size:11px;fill:#6B6157}
+.ac{font-size:12px;font-weight:500;fill:#A3302A}
+</style>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<rect x="40" y="32" width="600" height="812" rx="20" fill="#E9E2D4" stroke="#1F1B18" stroke-opacity=".15"/>
+
+<text class="tt" x="60" y="62">异兽志 MVP 结构图</text>
+<text class="tc" x="60" y="80">Day 7 · 2026-09-22 · 代码真源在 yizhi/ · 虚线框表示尚未建</text>
+
+<text class="tt" x="60" y="112">① 启动链与模块（谁调谁）</text>
+
+<rect x="60" y="136" width="150" height="44" rx="8" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".22"/>
+<text class="tb" x="135" y="158" text-anchor="middle" dominant-baseline="central">index.html</text>
+<line x1="215" y1="158" x2="242" y2="158" stroke="#6B6157" stroke-width="1" marker-end="url(#arrow)"/>
+
+<rect x="248" y="130" width="170" height="56" rx="8" fill="#F4EFE4" stroke="#A3302A" stroke-opacity=".45"/>
+<text class="tb" x="333" y="150" text-anchor="middle" dominant-baseline="central">js/main.js</text>
+<text class="ts" x="333" y="170" text-anchor="middle" dominant-baseline="central">装配层 · 唯一入口</text>
+
+<line x1="333" y1="186" x2="333" y2="208" stroke="#6B6157" stroke-width="1"/>
+<line x1="145" y1="208" x2="521" y2="208" stroke="#6B6157" stroke-width="1"/>
+<line x1="145" y1="208" x2="145" y2="230" stroke="#6B6157" stroke-width="1" marker-end="url(#arrow)"/>
+<line x1="333" y1="208" x2="333" y2="230" stroke="#6B6157" stroke-width="1" marker-end="url(#arrow)"/>
+<line x1="521" y1="208" x2="521" y2="230" stroke="#6B6157" stroke-width="1" marker-end="url(#arrow)"/>
+
+<rect x="60" y="232" width="170" height="56" rx="8" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".22"/>
+<text class="tb" x="145" y="252" text-anchor="middle" dominant-baseline="central">js/data.js</text>
+<text class="ts" x="145" y="272" text-anchor="middle" dominant-baseline="central">加载 · 校验条目</text>
+
+<rect x="248" y="232" width="170" height="56" rx="8" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".22"/>
+<text class="tb" x="333" y="252" text-anchor="middle" dominant-baseline="central">js/search.js</text>
+<text class="ts" x="333" y="272" text-anchor="middle" dominant-baseline="central">2-gram 倒排索引</text>
+
+<rect x="436" y="232" width="170" height="56" rx="8" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".22"/>
+<text class="tb" x="521" y="252" text-anchor="middle" dominant-baseline="central">js/views/grid.js</text>
+<text class="ts" x="521" y="272" text-anchor="middle" dominant-baseline="central">渲染卡片 · 图源判定</text>
+
+<line x1="145" y1="288" x2="145" y2="316" stroke="#6B6157" stroke-width="1" marker-end="url(#arrow)"/>
+<line x1="521" y1="288" x2="521" y2="316" stroke="#6B6157" stroke-width="1" marker-end="url(#arrow)"/>
+
+<rect x="60" y="318" width="170" height="56" rx="8" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".22"/>
+<text class="tb" x="145" y="338" text-anchor="middle" dominant-baseline="central">data/yishou.json</text>
+<text class="ts" x="145" y="358" text-anchor="middle" dominant-baseline="central">部文件 · 唯一真源</text>
+
+<rect x="436" y="318" width="170" height="56" rx="8" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".22"/>
+<text class="tb" x="521" y="338" text-anchor="middle" dominant-baseline="central">yizhi/assets/</text>
+<text class="ts" x="521" y="358" text-anchor="middle" dominant-baseline="central">私有图在 assets-private/</text>
+
+<rect x="60" y="402" width="546" height="52" rx="8" fill="none" stroke="#A3302A" stroke-opacity=".45" stroke-dasharray="4 3"/>
+<text class="ac" x="76" y="424">未建（M4–M6）</text>
+<text class="tc" x="76" y="442">store.js 收藏 · transit.js 转场 · renderDetail 详情 · 其余四个视图</text>
+
+<rect x="60" y="482" width="546" height="276" rx="14" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".22"/>
+<text class="tt" x="80" y="508">② 页面区块（index.html 的 DOM 骨架）</text>
+
+<rect x="80" y="524" width="506" height="30" rx="6" fill="none" stroke="#1F1B18" stroke-opacity=".15"/>
+<text class="ts" x="92" y="539" dominant-baseline="central">header.hero</text>
+<text class="tc" x="574" y="539" text-anchor="end" dominant-baseline="central">题识 · 定位语 · 竖排题签</text>
+
+<rect x="80" y="562" width="506" height="30" rx="6" fill="none" stroke="#1F1B18" stroke-opacity=".15"/>
+<text class="ts" x="92" y="577" dominant-baseline="central">div.tail</text>
+<text class="tc" x="574" y="577" text-anchor="end" dominant-baseline="central">版心鱼尾 · 纯装饰</text>
+
+<rect x="80" y="600" width="506" height="96" rx="8" fill="#E9E2D4" stroke="#1F1B18" stroke-opacity=".22"/>
+<text class="ts" x="92" y="618" dominant-baseline="central">div.scroll</text>
+<text class="tc" x="574" y="618" text-anchor="end" dominant-baseline="central">卷轴 · 上下轴 + 轴头</text>
+
+<rect x="92" y="630" width="154" height="48" rx="6" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".15"/>
+<text class="ts" x="169" y="646" text-anchor="middle" dominant-baseline="central">.finder</text>
+<text class="tc" x="169" y="664" text-anchor="middle" dominant-baseline="central">搜索框 + 五部 tab</text>
+
+<rect x="256" y="630" width="154" height="48" rx="6" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".15"/>
+<text class="ts" x="333" y="646" text-anchor="middle" dominant-baseline="central">.filter</text>
+<text class="tc" x="333" y="664" text-anchor="middle" dominant-baseline="central">吉凶筛选条</text>
+
+<rect x="420" y="630" width="154" height="48" rx="6" fill="#F4EFE4" stroke="#1F1B18" stroke-opacity=".15"/>
+<text class="ts" x="497" y="646" text-anchor="middle" dominant-baseline="central">.grid</text>
+<text class="tc" x="497" y="664" text-anchor="middle" dominant-baseline="central">图鉴网格 → 卡片</text>
+
+<rect x="80" y="706" width="506" height="30" rx="6" fill="none" stroke="#1F1B18" stroke-opacity=".15"/>
+<text class="ts" x="92" y="721" dominant-baseline="central">footer.colophon</text>
+<text class="tc" x="574" y="721" text-anchor="end" dominant-baseline="central">书尾 · 异兽印</text>
+
+<rect x="60" y="778" width="546" height="44" rx="8" fill="none" stroke="#1F1B18" stroke-opacity=".22"/>
+<text class="ts" x="76" y="800" dominant-baseline="central">div.margins</text>
+<text class="tc" x="590" y="800" text-anchor="end" dominant-baseline="central">装饰层 · aria-hidden · 版框 ≥1180px · 书签 ≥1300px</text>
+</svg>
