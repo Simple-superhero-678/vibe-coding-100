@@ -15,16 +15,11 @@
 
 import { 建图 } from './portrait.js';
 import { 关闭请求, 收藏切换, 导出请求 } from '../events.js';
+import { 建行 } from './card.js';
 
 /* 事件名集中在 js/events.js：这里是「发」的一端，main.js 是「听」的一端。 */
 
 /* —— 小工具 —— */
-function 建行(类名, 文本) {
-  const 节点 = document.createElement('p');
-  节点.className = 类名;
-  节点.textContent = 文本;   // 一律 textContent，条目内容不进 innerHTML
-  return 节点;
-}
 
 function 建钮(文字, 类名) {
   const 钮 = document.createElement('button');

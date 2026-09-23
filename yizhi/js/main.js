@@ -30,6 +30,7 @@ import { renderAxis } from './views/axis.js';
 import { renderResults } from './views/result.js';
 import { renderDetail, 设收藏态, 写提示 } from './views/detail.js';
 import { renderFavList } from './views/fav.js';
+import { 建行 } from './views/card.js';
 import { buildIndex, query } from './search.js';
 import * as store from './store.js';
 import { play as 播转场 } from './transit.js';
@@ -81,12 +82,7 @@ const 筛选钮 = new Map();      // 值 → 按钮（键 '__全部' 是复位�
    小工具
    ══════════════════════════════════════════════════════════════════════ */
 
-function 建行(类名, 文本) {
-  const 节点 = document.createElement('p');
-  节点.className = 类名;
-  节点.textContent = 文本;
-  return 节点;
-}
+/* 建行 已挪到 views/card.js（Day 8 余力加练：四处抄了同一份） */
 
 /* 空心块：只给 class，不给文字 —— 骨架要表达的是「形状」，写文字反而把形状盖住了 */
 function 建样式块(类名) {

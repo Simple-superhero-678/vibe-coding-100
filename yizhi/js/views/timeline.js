@@ -11,13 +11,9 @@
 // 本层不认识「数据从哪来」：只吃条目数组（§12.5）。类型次序是分类法，写在代码里；
 // 谁属于哪一类、排第几，一律来自 JSON。
 
+import { 建行 } from './card.js';
+
 /* —— 小工具 —— */
-function 建行(类名, 文本) {
-  const 节点 = document.createElement('p');
-  节点.className = 类名;
-  节点.textContent = 文本;   // 一律 textContent，条目内容不进 innerHTML
-  return 节点;
-}
 
 /* 六类型的次序（PRD §5 F2 的固定分类法）。段内的先后由数据里的 `序` 决定。 */
 const 类型序 = ['创世', '始祖', '洪水', '战争', '发明', '斗争'];

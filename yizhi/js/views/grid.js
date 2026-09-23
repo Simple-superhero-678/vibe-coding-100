@@ -5,58 +5,11 @@
 // 也不接收图源：图源属渲染细节，按 §4.4.4 在视图层内判定，调用方只给数据 ——
 // 但判定与出图的那几行挪到了 views/portrait.js，详情面板要共用同一份（M4）。
 
-import { 图源, 建图 } from './portrait.js';
+import { 图源 } from './portrait.js';
+import { 建行, 建图鉴卡 } from './card.js';
 
 /* 图源继续从这里转出去：main.js 一直在 import 它做启动日志，不因为搬家改调用方。 */
 export { 图源 };
-
-/* —— 小工具 —— */
-function 建行(类名, 文本) {
-  const 节点 = document.createElement('p');
-  节点.className = 类名;
-  节点.textContent = 文本;   // 一律 textContent，条目内容不进 innerHTML
-  return 节点;
-}
-
-/* —— 卡片 ——
-   卡片整张可点（点开详情）。可点的东西就得是键盘够得着的，
-   所以带 role/tabindex，由 main.js 的委托监听接 Enter / 空格。
-   data-id 是「点了之后打开哪一条」的唯一凭据 —— 装配层靠它反查条目，
-   而不是把整条数据塞进 DOM 里。 */
-function 建卡片(条) {
-  const 卡 = document.createElement('article');
-  卡.className = 'card';
-  卡.dataset.id = 条.id;
-  卡.setAttribute('role', 'button');
-  卡.setAttribute('tabindex', '0');
-  卡.setAttribute('aria-label', `打开「${条.名}」的详情`);
-
-  const 印章 = document.createElement('span');
-  印章.className = 'seal';
-  /* 印章标「吉凶」，没有吉凶的条目（E 部境界）退一步标「部」——
-     PRD 8.6 要的是「朱砂印章（方形角标，标吉凶或部类）」，两种都算数。
-     一律写成「未分类」就把这条识别特征浪费了。 */
-  印章.textContent = 条.吉凶 || 条.部 || '未分类';
-  卡.append(印章);
-
-  卡.append(建图(条));
-
-  const 身 = document.createElement('div');
-  身.className = 'card-body';
-
-  const 名 = document.createElement('h2');
-  名.className = 'card-name';
-  名.textContent = 条.名;
-  身.append(名);
-
-  if (条.别名 && 条.别名.length) 身.append(建行('card-alias', 条.别名.join(' · ')));
-  身.append(建行('card-quote', 条.原文));
-  if (条.写小说怎么用) 身.append(建行('card-use', 条.写小说怎么用));
-  身.append(建行('card-src', 条.出处));
-
-  卡.append(身);
-  return 卡;
-}
 
 /* —— 筛选（契约第三个参数） ——
    筛选态 = null | undefined | { 吉凶?: string | string[] }     空值或缺项 = 不过滤该项
@@ -84,7 +37,7 @@ export function renderGrid(容器, 条目, 筛选态) {
   if (!列表.length) {
     容器.append(建行('grid-empty', '暂时没有可显示的条目。'));
   } else {
-    列表.forEach(条 => 容器.append(建卡片(条)));
+    列表.forEach(条 => 容器.append(建图鉴卡(条)));
   }
 
   return 列表.length;

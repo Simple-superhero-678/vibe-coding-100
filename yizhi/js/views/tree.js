@@ -11,13 +11,9 @@
 // 层序与司序这两张表是 PRD 定死的分类法（与 data.js 里的吉凶枚举同性质），
 // 写在代码里是它该在的地方 —— 内容（谁是哪一层、归哪个司）一律来自 JSON。
 
+import { 建行 } from './card.js';
+
 /* —— 小工具 —— */
-function 建行(类名, 文本) {
-  const 节点 = document.createElement('p');
-  节点.className = 类名;
-  节点.textContent = 文本;   // 一律 textContent，条目内容不进 innerHTML
-  return 节点;
-}
 
 /* 层与司的顺序：分类法，不是内容 */
 const 层序 = ['三清', '四御', '职能部'];

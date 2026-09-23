@@ -8,13 +8,7 @@
 // 列表项做成可点的 —— 收藏夹里看到一条想去看看，不该逼人回到网格里再搜一遍。
 
 import { 打开请求, 收藏切换 } from '../events.js';
-
-function 建行(类名, 文本) {
-  const 节点 = document.createElement('p');
-  节点.className = 类名;
-  节点.textContent = 文本;   // 一律 textContent，条目内容不进 innerHTML
-  return 节点;
-}
+import { 建行 } from './card.js';
 
 /**
  * 画收藏列表。容器内容会被整体替换。

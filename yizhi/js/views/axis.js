@@ -12,13 +12,9 @@
 // 本层不认识「数据从哪来」：只吃条目数组与一个序列名，不 import data.js（§12.5）。
 // 序列开关（哪个序列被选中）属装配层 —— 与吉凶筛选条同理，本层只认第三个参数。
 
+import { 建行 } from './card.js';
+
 /* —— 小工具 —— */
-function 建行(类名, 文本) {
-  const 节点 = document.createElement('p');
-  节点.className = 类名;
-  节点.textContent = 文本;   // 一律 textContent，条目内容不进 innerHTML
-  return 节点;
-}
 
 /* 真丹道的阶号读作「一等..五等」：品第用汉字，进度用阿拉伯数字，这是刻意的区分 */
 const 汉字 = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];

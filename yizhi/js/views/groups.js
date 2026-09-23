@@ -10,13 +10,9 @@
 // 本层不认识「数据从哪来」：只吃条目数组与附注（§12.5）。
 // 六类的**次序**是分类法（与 data.js 里的吉凶枚举同性质），写在代码里；释义与年表来自 JSON。
 
+import { 建行 } from './card.js';
+
 /* —— 小工具 —— */
-function 建行(类名, 文本) {
-  const 节点 = document.createElement('p');
-  节点.className = 类名;
-  节点.textContent = 文本;   // 一律 textContent，条目内容不进 innerHTML
-  return 节点;
-}
 
 /* 六类的次序（PRD §4 / §5 F2 的固定分类法） */
 const 形类序 = ['妖', '魔', '鬼', '怪', '精', '灵'];
