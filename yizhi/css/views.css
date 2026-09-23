@@ -235,6 +235,72 @@
 }
 .near:hover{border-color:var(--cinnabar);color:var(--cinnabar)}
 
+/* —— 加载中：第四种状态（Day 8）——
+     为什么补它：另外三种都有「事件」当触发者（成功 = 默认路径、空 = 搜不到、
+     错 = 读不到），只有加载中发生在**没人操作、也没东西坏**的那几百毫秒里 ——
+     本地几乎看不见，慢网才暴露；而它没做好就是一片白，容易被读成「页面还没开」。
+
+     形制：不转圈。转圈是「现代 UI 语言」，与本子的纸墨调子不合。
+     改用「淡墨纸样」预告即将到来的形状：异兽部预告卡片（图 + 四行），
+     其余四部形状各异（树 / 轴 / 分组），预告不了具体形状，就只预告「有内容要来」。
+     淡墨浓度压在墨的 6–7%：它是「纸已经备好」，不是「这里有一块灰」。
+
+     防闪：骨架不靠 JS 计时，由 CSS 在 120ms 后才淡入 ——
+     快网下它还没现身就被真内容换掉了，慢网下才看得见。
+     这样 JS 里不必管一个定时器（少一处「忘了清除」就出鬼的地方）。 —— */
+/* ⚠️ grid-column:1/-1 不能省：视图台在网格部是 grid 容器，骨架块若不跨满整行，
+   就会被塞进「一列」里（实测 485px），里头四张卡只能纵向摞 → 与真卡片的两列排布不符，
+   数据到位时会看见一次版式跳动。跨满整行后，骨架与真卡片才落在同一套栅格上。 */
+.skeleton{grid-column:1/-1;opacity:0;animation:sk-in .28s var(--ease) .12s forwards;margin-top:18px}
+/* 异兽部：复用网格的列宽，让骨架与真卡片落在同一套栅格上（数据到位时不跳位） */
+.skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:22px}
+.sk-hint{
+  grid-column:1/-1;margin:0;
+  font-family:var(--serif);font-size:13px;letter-spacing:.16em;color:var(--ink-2);
+  display:flex;align-items:center;gap:10px;
+}
+/* 提示前的一小节朱砂「起笔」：全站只有一条朱砂线在动，这里也不破例去添第二种动效 */
+.sk-hint::before{
+  content:"";display:inline-block;
+  width:14px;height:2px;background:var(--cinnabar);
+  animation:sk-dash 1.6s ease-in-out infinite alternate;
+}
+/* ⚠️ width:100% 不能省：骨卡里没有自带固有宽度的内容（图块靠 aspect-ratio、
+   文本条靠百分比宽），配 justify-self:center 会被收缩成「最小宽度」（实测 260px），
+   于是骨架比真卡片窄一截。真卡片能撑开是因为它的文字有固有宽度。 */
+.sk-card{
+  display:grid;grid-template-columns:clamp(180px,52%,232px) 1fr;gap:18px;
+  width:100%;max-width:560px;justify-self:center;
+  background:var(--paper);border:1px solid var(--hairline);
+  padding:14px;padding-right:46px;         /* 与 .card 同参数，别让骨架比真卡片窄一圈 */
+}
+.sk-figure{display:block;aspect-ratio:3/4;background:rgba(31,27,24,.07)}
+.sk-body{display:flex;flex-direction:column;gap:12px;padding-top:8px;min-width:0}
+.sk-bar{display:block;height:11px;background:rgba(31,27,24,.07)}
+.sk-bar.w62{width:62%}
+.sk-bar.w34{width:34%}
+.sk-bar.w92{width:92%}
+.sk-bar.w78{width:78%}
+.sk-line{display:block;height:13px;margin:0 0 13px;background:rgba(31,27,24,.06)}
+.sk-line.w48{width:48%}
+.sk-line.w56{width:56%}
+.sk-line.w70{width:70%}
+.sk-line.w82{width:82%}
+/* 呼吸：极浅的 opacity 往返。幅度压在 .5–.9 之间 ——
+   骨架的淡墨本来只有 6%，再乘 0.5 就是 3%，远看仍是纸纹，不会变成抢眼的灰块。 */
+.sk-figure,.sk-bar,.sk-line{animation:sk-breath 1.6s ease-in-out .45s infinite alternate}
+@keyframes sk-in{to{opacity:1}}
+@keyframes sk-breath{from{opacity:.5}to{opacity:.9}}
+@keyframes sk-dash{from{opacity:.35}to{opacity:1}}
+
+/* 系统开「减少动态效果」时：不动，但**必须仍然可见**。
+   ⚠️ 只写 animation:none 会把 .skeleton 的 opacity:0 留在原地 → 骨架彻底隐形，
+   于是「加载中」在最需要它的用户那里反而变成白屏。所以这里补回 opacity:1。 */
+@media(prefers-reduced-motion:reduce){
+  .skeleton{opacity:1;animation:none}
+  .sk-hint::before,.sk-figure,.sk-bar,.sk-line{animation:none;opacity:.75}
+}
+
 /* —— 手机宽度：单列，不横向滚动（PRD 8.6 / 9.2 ④） —— */
 @media(max-width:720px){
   .finder{margin-top:12px;padding:8px 0 10px}
@@ -256,6 +322,10 @@
   .card-use{margin-top:10px}
   .card-src{margin-top:9px}
   .portrait,.portrait-empty{padding:4px}
+  /* 骨架跟着真卡片一起收窄，各参数与上面对 .card 的处理保持一致 */
+  .skeleton-grid{grid-template-columns:1fr;gap:16px}
+  .sk-card{grid-template-columns:132px 1fr;gap:14px;padding:13px;padding-right:48px}
+  .sk-body{gap:10px;padding-top:6px}
 }
 
 /* ══════════════════════════════════════════════════════════════════════
