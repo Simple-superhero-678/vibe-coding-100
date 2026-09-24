@@ -200,6 +200,7 @@
 .act-fav[aria-pressed="true"]{
   background:transparent;color:var(--cinnabar);border-color:var(--cinnabar);
 }
+/* 详情底部的「收起」推到行尾（这里只有它一个占 auto，是对的） */
 .act-close{margin-left:auto;color:var(--ink-2)}
 .act-hint{
   flex-basis:100%;
@@ -228,8 +229,13 @@
   margin:0;
   font-family:var(--serif);font-size:12.5px;letter-spacing:.14em;color:var(--ink-2);
 }
-/* 「导出全部」被推到行尾，「收起」跟在它后面 —— 只推第一个，不是两个都推 */
+/* 「导出全部」被推到行尾，「收起」跟在它后面 —— 只推第一个，不是两个都推。
+   09-24 修：.act-close 的 margin-left:auto 是给「详情底部」写的，但「收起」在收藏面板头部
+   也用同一个类，于是头部出现两个 auto —— flex 会把剩余空间在两者之间**均分**，
+   「导出全部」被顶到面板中间，与「收起」隔了 278px（实测：两键 margin-left 都是 264.469px）。
+   这里显式收掉第二个 auto。 */
 .panel-head .act-export{margin-left:auto}
+.panel-head .act-close{margin-left:0}
 .panel-hint{
   margin:0;padding:8px 26px 0;
   min-height:1.2em;

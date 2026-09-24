@@ -27,7 +27,10 @@
   padding:4px 2px 6px;
   outline:none;
 }
-.seek::placeholder{color:var(--ink-2);opacity:.7;font-size:15px;letter-spacing:.04em}
+/* 09-24 修对比：原来 ink-2 之上又叠 opacity:.7，实测渲染色 rgb(147,138,128) / 纸 rgb(245,241,230)
+   = 3.01:1，低于 AA 4.5:1。去掉那层透明（ink-2 对纸本身 5.73:1），
+   弱于正文（墨对纸 16.2:1）但已读得清。 */
+.seek::placeholder{color:var(--ink-2);font-size:15px;letter-spacing:.04em}
 .seek:focus{border-bottom-color:var(--cinnabar)}   /* 全站唯一动的一笔 */
 .seek::-webkit-search-cancel-button{-webkit-appearance:none}
 
@@ -79,17 +82,25 @@
 /* 「当前 0 条」弱化 —— 必须写在选中态之前：
    两个规则特异性一样（都是 .chip + 一个属性选择器），同分时后写的赢。 */
 .chip[data-空="1"]{opacity:.42}
-.chip[data-空="1"] .chip-n{opacity:1}    /* 数字不再叠第二层透明，否则那个「0」根本看不清 */
+/* 数字不再叠第二层透明。注：父级的 opacity 无法被子级抵消，
+   这里的 1 是「别再加一层」的意思，不是「把它变清楚」。 */
+.chip[data-空="1"] .chip-n{opacity:1}
 /* 选中态压过上面的弱化：否则点了「凶恶」这类空分类，是朱砂色但整颗 42% 透明，
    看起来跟没选中一样 —— 而它恰恰是最需要看清「我开了哪个筛选」的时候。 */
 .chip[aria-pressed="true"]{color:var(--cinnabar);border-bottom-color:var(--cinnabar);opacity:1}
+/* 09-24 修对比：11px 的计数是最小号的字，原来叠了 opacity:.7 —— 与占位文字同一个病
+   （ink-2 再透明 30%，推算 2.9:1）。现在直接用明确色阶：未选中 ink-2（5.73:1），
+   选中朱砂（6.6:1）——都过 4.5:1，且「弱化」这件事仍由颜色深浅表达，不靠透明度。 */
 .chip-n{
   font-family:var(--sans);
   font-size:11px;letter-spacing:0;
   margin-left:6px;
-  color:var(--ink-2);opacity:.7;
+  color:var(--ink-2);
 }
-.chip[aria-pressed="true"] .chip-n{color:var(--cinnabar);opacity:.85}
+.chip[aria-pressed="true"] .chip-n{color:var(--cinnabar)}
+/* 筛选条里 chip 之间的间隙只有 2px（.filter 的 gap），而焦点环统一外扩 2px ——
+   会正好压到相邻那枚钮的边上。这里收成 0，环贴着钮自己的边画。 */
+.chip:focus-visible{outline-offset:0}
 .chip-sep{
   width:1px;height:13px;margin:0 10px;
   background:var(--hairline);

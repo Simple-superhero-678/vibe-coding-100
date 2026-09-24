@@ -338,6 +338,20 @@ body{
   padding-left:16px;
 }
 
+/* —— 键盘焦点（全站一套语言）——
+   09-24：`:focus-visible` 原先只写在 6 个「卡片类」元素上（.card / .tree-leaf / .tl-item /
+   .grp-item / .result-item / .axis-node），而 5 个部 tab、5 个吉凶 chip、收藏入口、
+   详情三键、导出 / 收起这些真 <button> 全落回浏览器默认焦点环 —— 同一页面上两套焦点语言
+   （实测：26 个交互控件里 13 个没有站内样式）。
+   现在把默认语言收成一处：朱砂环 + 2px 外扩，与卡片完全相同。
+   .seek 排除在外：它自带「朱砂下划线」（views.css 的 .seek:focus），再叠一圈环是画蛇添足。 */
+button:focus-visible,
+input:not(.seek):focus-visible,
+[tabindex]:focus-visible{
+  outline:2px solid var(--cinnabar);
+  outline-offset:2px;
+}
+
 @media(max-width:720px){
   .shell{padding:3.5vh 20px 5vh}
   .hero{gap:18px}
