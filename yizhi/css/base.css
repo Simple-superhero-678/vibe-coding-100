@@ -338,16 +338,23 @@ body{
   padding-left:16px;
 }
 
-/* —— 键盘焦点（全站一套语言）——
-   09-24：`:focus-visible` 原先只写在 6 个「卡片类」元素上（.card / .tree-leaf / .tl-item /
-   .grp-item / .result-item / .axis-node），而 5 个部 tab、5 个吉凶 chip、收藏入口、
-   详情三键、导出 / 收起这些真 <button> 全落回浏览器默认焦点环 —— 同一页面上两套焦点语言
-   （实测：26 个交互控件里 13 个没有站内样式）。
-   现在把默认语言收成一处：朱砂环 + 2px 外扩，与卡片完全相同。
-   .seek 排除在外：它自带「朱砂下划线」（views.css 的 .seek:focus），再叠一圈环是画蛇添足。 */
-button:focus-visible,
-input:not(.seek):focus-visible,
-[tabindex]:focus-visible{
+/* ══ 组件基线 · 键盘焦点（任何可交互组件自动继承）═══════════════════════
+   [规则] 只要元素承担「可交互」这个角色，聚焦时就必须有一圈朱砂环。
+   [判据] WCAG 2.4.7 焦点可见；环宽 2px、外扩 2px；色 = 全站唯一强调色朱砂。
+   [为什么按角色、不按类名] 09-24 之前这条是「列举具体选择器」（button / input /
+          [tabindex]）—— 新增一种组件就得记得补一次，实测漏到 13/26 个控件没有站内
+          焦点环，同一页面出现两套焦点语言（浏览器默认细黑环 + 卡片朱砂环）。
+          改成按角色选之后：**新组件只要在 HTML 里声明了角色，就自动合规，不必再写 CSS**。
+   [怎么扩展] 新组件的角色不在下面清单里 → 把它加进 :where() 一行即可。
+          组件自身要微调（例：筛选条 .chip 之间 gap 只有 2px，环外扩会压到邻居），
+          在组件自己的规则里写 `:focus-visible{outline-offset:0}` 覆盖 ——
+          :where() 特异性为 0，专门规则永远压得住它，这就是「基线 + 特例」的分工。
+   [例外] .seek 排除：它自带「朱砂下划线」（views.css 的 .seek:focus），再叠一圈环是画蛇添足。
+   ═══════════════════════════════════════════════════════════════════════ */
+:where(button,
+       [role="button"], [role="tab"], [role="switch"], [role="link"],
+       input:not(.seek), select, textarea,
+       [tabindex]):focus-visible{
   outline:2px solid var(--cinnabar);
   outline-offset:2px;
 }

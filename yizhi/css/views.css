@@ -325,8 +325,11 @@
   .chip{font-size:13px;padding:3px 8px 4px;letter-spacing:.1em}
   .chip-sep{margin:0 6px}
   .grid{grid-template-columns:1fr;justify-content:stretch;gap:16px;margin-top:14px}
-  .card{grid-template-columns:132px 1fr;gap:14px;padding:13px;padding-right:48px}
-  .card-name{font-size:19px}
+  .card{grid-template-columns:132px 1fr;gap:14px;padding:13px;padding-right:13px}
+  /* 09-24：印章 42×42 只占卡片顶部（实测卡片高 297、印章到 y=43 就没了），
+     而原来的 padding-right:48 是「整张卡右侧全高」让位 —— 实测文字列只剩 141px（13px 字约 10.8 字/行）。
+     改为让位只给首行：正文列拿回 35px（141 → 176）。 */
+  .card-name{font-size:19px;padding-right:38px}
   .card-name::before{width:6px;height:6px;margin-right:9px}
   .card-alias{margin-top:6px}
   .card-quote{margin-top:10px;font-size:13.5px}
@@ -335,7 +338,7 @@
   .portrait,.portrait-empty{padding:4px}
   /* 骨架跟着真卡片一起收窄，各参数与上面对 .card 的处理保持一致 */
   .skeleton-grid{grid-template-columns:1fr;gap:16px}
-  .sk-card{grid-template-columns:132px 1fr;gap:14px;padding:13px;padding-right:48px}
+  .sk-card{grid-template-columns:132px 1fr;gap:14px;padding:13px;padding-right:13px}
   .sk-body{gap:10px;padding-top:6px}
 }
 
