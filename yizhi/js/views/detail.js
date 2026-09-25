@@ -210,8 +210,15 @@ export function renderDetail(条) {
   const 收藏 = 建钮('收藏', 'act act-fav');
   收藏.dataset.act = '收藏';
   收藏.setAttribute('aria-pressed', 'false');
+  收藏.setAttribute('aria-disabled', 'false');
   收藏.addEventListener('click', () => {
-    面板.dispatchEvent(new CustomEvent(收藏切换, { bubbles: true, detail: { id: 条.id } }));
+    /* 处理中不接第二次。判据用 aria-disabled 而不是 disabled ——
+       disabled 会把焦点从按钮上踢走，键盘用户点一次就丢了位置，
+       等按钮回来还得重新 Tab 过来；aria-disabled 只声明状态，拦截交给这一行。 */
+    if (收藏.getAttribute('aria-disabled') === 'true') return;
+    /* 先自己应一声「收到了」，再去等装配层 —— 见下面 设收藏态 的说明 */
+    设收藏态(面板, '处理中');
+    面板.dispatchEvent(new CustomEvent(收藏切换, { bubbles: true, detail: { id: 条.id, 来源: '按钮' } }));
   });
 
   const 复制 = 建钮('复制全文', 'act act-copy');
@@ -247,25 +254,98 @@ export function renderDetail(条) {
   return 面板;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Day 11 · 交互反馈
+   ══════════════════════════════════════════════════════════════════════
+   今天要回答的问题：用户怎么最明确地知道「生效了」？
+   答案不是提示文字 —— 提示会被忽略、会被读一半；**被点的那个东西自己变了**才是硬信号。
+   所以这里的做法是「主按钮自己给状态」+「就近一句说明 + 一个能立刻反悔的出口」两条通道叠加：
+     ① 按钮态（收藏 → 处理中… → 已收藏）：不读字也看得见
+     ② 反馈条（一句话 + 可选的「撤销 / 重试」）：说清发生了什么、现在能做什么
+   两条都在**原位置**上变化 —— 不新增浮层、不弹窗、不把布局顶开（PRD 8.6）。
+
+   ⚠️ 为什么「处理中」这一态由视图自己置、不等装配层回话：
+      点下去到存储写完之间有一段谁也不知道结果的等待（慢网、首次跨部载入数据时尤其明显）。
+      这一态就是那句「我收到了，正在办」；没有它，用户会以为没点中，然后再点一次。
+   ⚠️ 为什么用 aria-disabled 而不是 disabled：见 收藏 按钮的点击守卫。 */
+
+const 收藏文案 = { 未收藏: '收藏', 已收藏: '已收藏', 处理中: '处理中…' };
+
 /**
  * 同步收藏按钮的样子。main.js 每次收藏变化后调它 ——
  * 面板不自己去问 store，问也是 main 的事。
  * @param {HTMLDialogElement} 面板 renderDetail 的返回值
- * @param {boolean} 已收藏
+ * @param {'未收藏'|'已收藏'|'处理中'|boolean} 态 传 boolean 时按「未收藏 / 已收藏」处理（旧签名，仍可用）
+ * @param {{闪?: boolean}} 选项 闪 = 本次变化播一次描边闪动（只在「已收藏」时生效）
  */
-export function 设收藏态(面板, 已收藏) {
+export function 设收藏态(面板, 态, { 闪 = false } = {}) {
   const 钮 = 面板.querySelector('.act-fav');
   if (!钮) return;
-  钮.textContent = 已收藏 ? '已收藏' : '收藏';
-  钮.setAttribute('aria-pressed', 已收藏 ? 'true' : 'false');
+
+  /* 旧签名兼容：boolean → 两个稳定态之一 */
+  const 名 = 态 === true ? '已收藏' : 态 === false ? '未收藏' : 态;
+  const 键 = 收藏文案[名] ? 名 : '未收藏';
+  const 忙 = 键 === '处理中';
+
+  钮.textContent = 收藏文案[键];
+  钮.setAttribute('aria-pressed', 键 === '已收藏' ? 'true' : 'false');
+  钮.setAttribute('aria-disabled', 忙 ? 'true' : 'false');
+  钮.setAttribute('aria-busy', 忙 ? 'true' : 'false');
+
+  if (闪 && 键 === '已收藏') 播一次闪动(钮);
+}
+
+/* 描边闪一下（.28s，只播一次）。全站第二条动效，仍然只让**朱砂**动。
+   用途单一 —— 让「刚刚那下成了」抢到一次注意力。所以它由调用方点名要（闪: true），
+   不做成「每次设态都播」：那样每开一条详情都在闪，就成了噪音。 */
+function 播一次闪动(钮) {
+  /* 尊重系统的「减少动态效果」：撤掉动画，反馈靠文案与颜色照旧成立 */
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  钮.classList.remove('is-flash');
+  void 钮.offsetWidth;   /* 强制一次重排：连着两次收藏时，同一个 class 要能重新起动画 */
+  钮.classList.add('is-flash');
+  钮.addEventListener('animationend', () => 钮.classList.remove('is-flash'), { once: true });
 }
 
 /**
- * 在面板底部写一句提示（收藏成功 / 复制成功 / 存不上）。
+ * 在面板底部写一条反馈（收藏成功 / 已撤销 / 没存上）。
+ * 空文本 = 清空。位置是常驻的那一行，只换内容，不动布局。
  * @param {HTMLDialogElement} 面板
  * @param {string} 文本
+ * @param {{语气?: 'ok'|'bad', 动作?: {文字: string, 无障碍文案?: string, 点击: Function}}} 选项
+ *        语气 bad = 朱砂色（失败专用，与「危/损」同色，不引入第二种红）
+ *        动作 = 就近的下一步（「撤销」「重试」），**一次性** —— 点过即失效，防连点
+ *        无障碍文案：按钮上只写「撤销」两个字，读屏单独念出来不知撤销的是哪一条，
+ *                   所以给它一句完整的 name（例：撤销收藏「九尾狐」）
  */
-export function 写提示(面板, 文本) {
+export function 写提示(面板, 文本, 选项 = {}) {
   const 位 = 面板.querySelector('.act-hint');
-  if (位) 位.textContent = 文本;
+  if (!位) return;
+
+  const { 语气 = 'ok', 动作 } = 选项;
+
+  位.textContent = '';                                   /* 连带清掉上一条的动作按钮 */
+  位.classList.toggle('is-bad', 语气 === 'bad');
+
+  if (!文本) return;
+
+  /* 文本与按钮分成两个节点：反馈条是 flex，文本可换行、按钮不缩水。
+     用 span 不用 建行()—— 反馈条本身就是 <p>，<p> 里塞 <p> 是非法结构。 */
+  const 句 = document.createElement('span');
+  句.className = 'act-hint-text';
+  句.textContent = 文本;
+  位.append(句);
+
+  if (动作) {
+    const 钮 = document.createElement('button');
+    钮.type = 'button';
+    钮.className = 'hint-act';
+    钮.textContent = 动作.文字;
+    if (动作.无障碍文案) 钮.setAttribute('aria-label', 动作.无障碍文案);
+    钮.addEventListener('click', 事件 => {
+      钮.disabled = true;      /* 一次性：连点两下「撤销」不该翻转两次 */
+       动作.点击(事件);
+    });
+    位.append(钮);
+  }
 }

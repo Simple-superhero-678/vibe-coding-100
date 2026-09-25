@@ -193,6 +193,11 @@
   transition:color .16s var(--ease),border-color .16s var(--ease),background-color .16s var(--ease);
 }
 .act:hover{border-color:var(--ink-2)}
+/* 处理中（Day 11）：按钮不接受第二次点击。用 aria-disabled 而不是 :disabled ——
+   见 detail.js 的点击守卫：:disabled 会把焦点踢走，键盘用户点一次就丢了位置。
+   弱化与 not-allowed 光标由 base.css 的「组件基线 · 不可用态」统一给（基线管通用表现）；
+   这里只补基线压不住的那一处 —— **悬停不许再变色**，否则按钮看着还是「能点」。 */
+.act[aria-disabled="true"]:hover{border-color:var(--hairline)}
 /* 收藏是这一区的主动作：给墨色实底。已收藏则退回朱砂描边 ——
    让「现在是不是收藏着」在不读文字的情况下也能看出来。 */
 .act-fav{background:var(--ink);border-color:var(--ink);color:var(--paper)}
@@ -200,14 +205,57 @@
 .act-fav[aria-pressed="true"]{
   background:transparent;color:var(--cinnabar);border-color:var(--cinnabar);
 }
+/* —— 收藏成功「落印」闪动（Day 11）——
+   全站第二条动效，规矩不变：动的仍然只有朱砂，而且只播一次（.28s）。
+   做法是让按钮里**淡淡落一层朱砂**再退掉 —— 像按印时先着墨、再抬手，
+   而不是发光/放大/位移（那些是「现代 UI 语言」，与纸墨的调子不合）。
+   只在 aria-pressed=true（已收藏）时挂，否则会把墨色实底闪成一片淡红。 */
+@keyframes 收藏落印{
+  0%  {background:rgba(163,48,42,.20)}
+  100%{background:transparent}
+}
+.act-fav[aria-pressed="true"].is-flash{animation:收藏落印 .28s var(--ease) 1}
+@media(prefers-reduced-motion:reduce){
+  /* 系统开了「减少动态效果」就整条撤掉 —— 反馈仍由文案与颜色给出，不依赖动效 */
+  .act-fav[aria-pressed="true"].is-flash{animation:none}
+}
 /* 详情底部的「收起」推到行尾（这里只有它一个占 auto，是对的） */
 .act-close{margin-left:auto;color:var(--ink-2)}
+/* 反馈条（Day 11）——
+   位置与高度都不动：这一行本来就常驻（一整行 + min-height），今天只是从「一句话」
+   变成「一句话 + 一个可选的小动作按钮」。所以：
+     · 用 flex + align-items:baseline 让文本与按钮**同一条基线**上，行盒高度仍由
+       12.5px 的正文行高（body 的 1.9）决定 —— 小按钮不许把这一行顶高；
+     · 动作按钮做成**文字按钮**（无边框、无内边距、带下划线）：加一个 1px 描边方框会
+       让 15px 高的小按钮超出行盒，整条操作区就跟着长高 2px。零 border/padding 才是
+       真正「布局不变」的做法，顺带也和纸墨的调子相近（不是又一个色块）。 */
 .act-hint{
   flex-basis:100%;
+  display:flex;align-items:baseline;gap:10px;
   margin:0;
   font-size:12.5px;letter-spacing:.06em;color:var(--ink-2);
   min-height:1.2em;                  /* 常驻一行高度，文字出现时不把上面的按钮顶得一跳 */
+  transition:color .16s var(--ease);
 }
+/* 失败态：整条转朱砂。同色即「危/损」的既有语言，不引入第二种红。 */
+.act-hint.is-bad{color:var(--cinnabar)}
+.act-hint-text{min-width:0}
+.hint-act{
+  appearance:none;-webkit-appearance:none;
+  flex:none;
+  font-family:var(--serif);
+  font-size:12.5px;line-height:1.2;letter-spacing:.1em;
+  color:var(--cinnabar);background:none;
+  border:0;padding:0;
+  cursor:pointer;
+  text-decoration:underline;
+  text-decoration-thickness:1px;
+  text-underline-offset:3px;
+  transition:opacity .16s var(--ease);
+}
+.hint-act:hover{opacity:.72}
+/* 点过即失效（防连点重复派发）：只在它被换掉前的这一瞬可见，弱化即可，不必变灰 */
+.hint-act:disabled{cursor:default;opacity:.5}
 
 /* —— 收藏列表 —— */
 .panel-head{
@@ -241,6 +289,8 @@
   min-height:1.2em;
   font-size:12.5px;letter-spacing:.06em;color:var(--ink-2);
 }
+/* 收藏面板头下那句提示的语气（Day 11）：与详情面板的失败态同一套语言 */
+.panel-hint.is-bad{color:var(--cinnabar)}
 .fav-body{padding:8px 26px 26px}
 
 .fav-list{margin:0;padding:0;list-style:none}
