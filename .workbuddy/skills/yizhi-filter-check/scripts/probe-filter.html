@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>筛选自检探针（过程文件，跑完即删）</title>
+<!-- /__never 永不返回：把 load 卡住，取样点才不会落在探针跑完之前。
+     探针收尾时把这个 img 摘掉，load 随即完成，Edge 立刻 dump。 -->
+<img id="卡子" src="/__never" alt="" style="display:none">
+</head>
+<body>
+<pre id="out">（探针尚未跑完）</pre>
+<iframe id="框" src="/index.html" width="1180" height="900" style="border:0"></iframe>
+<script>
+/* 筛选交互自检探针 · 由 tools 侧的 run-filter-check.py 驱动
+   规矩：只从 UI 外部驱动（点真按钮），不 import 站点内部函数、不直接改页面状态。
+   夹具=1 时，yishou.json 里的 2 条「灾祸」已被临时改成「无害」，期望值随之改。 */
+
+const 参 = new URLSearchParams(location.search);
+const 夹具 = 参.get('夹具') === '1';
+const 截图名 = 参.get('截图');        // 有值 = 截图模式：只把页面停在某个筛选态，不跑断言
+
+const 期望 = 夹具
+  ? { 全部: 12, 吉祥: 4, 凶恶: 2, 灾祸: 0, 无害: 6 }
+  : { 全部: 12, 吉祥: 4, 凶恶: 2, 灾祸: 2, 无害: 4 };
+
+const 名表 = ['全部', '吉祥', '凶恶', '灾祸', '无害'];
+const 用例 = [];
+const 软断言 = [];
+const 错误日志 = [];
+
+function 记(名, 通过, 详情) { 用例.push({ 用例: 名, 通过: !!通过, 详情: 详情 }); }
+
+function 断(名, 实, 期) {
+  const a = JSON.stringify(实), b = JSON.stringify(期);
+  记(名, a === b, a === b ? '实际 = ' + a : '期望 ' + b + '，实际 ' + a);
+}
+
+function 断真(名, 条件, 实) {
+  记(名, !!条件, (条件 ? '通过：' : '不成立：') + 实);
+}
+
+const 框 = document.getElementById('框');
+const 档 = () => 框.contentDocument;
+const 卡 = () => Array.prototype.slice.call(档().querySelectorAll('#视图台 .card'));
+const 站况 = () => (档().getElementById('站况') || {}).textContent || '';
+const chips = () => Array.prototype.slice.call(档().querySelectorAll('#部工具 .chip'));
+const 找钮 = 名 => chips().filter(b => String((b.firstChild && b.firstChild.textContent) || '').trim() === 名)[0];
+const 徽标 = 钮 => (钮 && 钮.querySelector('.chip-n')) ? 钮.querySelector('.chip-n').textContent : '(缺)';
+const 按态 = 名 => { const b = 找钮(名); return b ? b.getAttribute('aria-pressed') : '(缺钮)'; };
+
+const 睡 = 毫秒 => new Promise(r => setTimeout(r, 毫秒));
+
+/* 现场快照：等条件失败时把它写进详情，免得只知道「超时了」而不知当时是什么状态 */
+function 现场(标) {
+  const 试 = (fn) => { try { return fn(); } catch (e) { return 'ERR: ' + ((e && e.message) || e); } };
+  return {
+    标: 标,
+    卡数: 试(() => 卡().length),
+    站况: 试(() => 站况()),
+    台class: 试(() => 台类()),
+    按钮态: 试(() => 名表.map(按态).join(',')),
+    iframe就绪: 试(() => 档().readyState),
+    错误: 错误日志.slice()
+  };
+}
+
+function 台类() { return 档().getElementById('视图台').className; }
+
+async function 等(条件, 名, 上限) {
+  const 止 = Date.now() + (上限 || 8000);
+  while (Date.now() < 止) {
+    try { if (条件()) return true; } catch (e) { /* iframe 还没就绪 */ }
+    await 睡(60);
+  }
+  throw new Error('等不到真条件：' + 名 + ' · 现场 ' + JSON.stringify(现场('超时')));
+}
+
+function 收尾() {
+  const 过数 = 用例.filter(u => u.通过).length;
+  const 下限 = 夹具 ? 20 : 14;      // 防「探针中途抛错、用例没跑几条却全过」
+  const 全过 = 用例.length >= 下限 && 过数 === 用例.length;
+  const 根 = document.documentElement;
+  根.setAttribute('data-探针', 全过 ? 'PASS' : 'FAIL');
+  根.setAttribute('data-用例', 过数 + '/' + 用例.length);
+  根.setAttribute('data-夹具', 夹具 ? '1' : '0');
+  document.getElementById('out').textContent = JSON.stringify({
+    环境: { 地址: location.href, 夹具: 夹具 ? 1 : 0, UA: navigator.userAgent },
+    通过: 过数, 总数: 用例.length, 结果: 用例, 软断言: 软断言
+  }, null, 2);
+  const 卡子 = document.getElementById('卡子');
+  if (卡子) 卡子.remove();           // 放开 load，让 Edge 立刻取样
+}
+
+(async () => {
+  /* ── 截图模式：把页面停在某个筛选态，交给 Edge --screenshot 拍 ──────── */
+  if (截图名) {
+    /* 把站点铺满窗口、藏掉探针自己的输出块 —— 截出来就是站点本身的样子，
+       而不是「一个页面套着一个页面」 */
+    const 样式 = document.createElement('style');
+    样式.textContent = 'html,body{margin:0} #out{display:none} #框{position:fixed;left:0;top:0;width:100vw;height:100vh;border:0}';
+    document.head.append(样式);
+    try {
+      await 等(() => 卡().length === 期望.全部, 'iframe 铺出 12 张卡', 20000);
+      await 睡(800);                       // 等图片回退等异步副作用落定
+      if (截图名 !== '原始') {
+        const 钮 = 找钮(截图名);
+        if (钮) { 钮.click(); await 睡(1000); }
+      }
+      await 睡(900);
+      记('截图模式：' + 截图名, true, 现场('停在这个状态'));
+    } catch (因) {
+      记('截图模式：' + 截图名, false, String((因 && 因.message) || 因));
+    }
+    document.documentElement.setAttribute('data-探针', 'SHOT');
+    document.getElementById('out').textContent = JSON.stringify(用例, null, 2);
+    const 卡子0 = document.getElementById('卡子');
+    if (卡子0) 卡子0.remove();
+    return;
+  }
+
+  try {
+    /* 等 iframe 真就绪：异兽部 12 张卡铺出来才算数
+       （iframe 的 contentDocument 在 src 加载前就有个 about:blank，只能轮询真条件） */
+    await 等(() => 卡().length === 期望.全部, 'iframe 铺出 12 张异兽卡', 20000);
+    await 睡(400);   // 让图片 404 回退这类异步副作用落定，免得采到中间态
+
+    /* 挂上页面内的错误收集：点击后若站点脚本抛错，要看得见，而不是只看到「状态没变」 */
+    try {
+      const 窗 = 框.contentWindow;
+      窗.addEventListener('error', e => 错误日志.push('error: ' + e.message));
+      窗.addEventListener('unhandledrejection', e => 错误日志.push('reject: ' + ((e.reason && e.reason.message) || e.reason)));
+    } catch (e) { 错误日志.push('挂监听失败: ' + e.message); }
+
+    /* ── A 组：基线 ───────────────────────────────────────── */
+    断('A1 筛选条 5 个 chip（全部 + 四值）', chips().length, 5);
+    断('A2 每个 chip 都标了条数', 名表.map(n => 徽标(找钮(n))), 名表.map(n => String(期望[n])));
+    断('A3 基线卡片数', 卡().length, 期望.全部);
+    断('A4 基线站况', 站况(), '异兽部 · ' + 期望.全部 + ' 条');
+
+    /* ── A 组：有结果 ─────────────────────────────────────── */
+    const 吉祥钮 = 找钮('吉祥');
+    if (!吉祥钮) { 记('A5 前置：找得到「吉祥」按钮', false, '按钮列表 = ' + chips().map(b => b.firstChild && b.firstChild.textContent).join('/')); throw new Error('找不到「吉祥」按钮'); }
+    吉祥钮.click();
+    await 睡(200);
+    const 点后 = 现场('点击「吉祥」后 200ms');
+    try {
+      await 等(() => 卡().length === 期望.吉祥 && 站况().indexOf('筛「吉祥」') >= 0, '点「吉祥」后条数与站况同时到位');
+    } catch (因) {
+      记('A5 诊断：点「吉祥」后的现场', false, JSON.stringify(点后));
+      throw 因;
+    }
+    断('A5 有结果：卡片数', 卡().length, 期望.吉祥);
+    断('A6 有结果：站况写明筛法与条数', 站况(), '异兽部 · 筛「吉祥」 · ' + 期望.吉祥 + ' 条');
+    断('A7 aria-pressed 跟着选中态走', [按态('吉祥'), 按态('全部'), 按态('凶恶')], ['true', 'false', 'false']);
+
+    /* ── A 组：多选取「或」 ───────────────────────────────── */
+    找钮('凶恶').click();
+    await 等(() => 卡().length === 期望.吉祥 + 期望.凶恶 && 站况().indexOf('或') >= 0, '多选后条数与「或」文案同时到位');
+    断('A8 多选：卡片数（或 = 相加）', 卡().length, 期望.吉祥 + 期望.凶恶);
+    断('A9 多选：站况显式写「或」', 站况(), '异兽部 · 筛「吉祥 或 凶恶」 · ' + (期望.吉祥 + 期望.凶恶) + ' 条');
+
+    /* ── A 组：清空恢复 ───────────────────────────────────── */
+    找钮('全部').click();
+    await 等(() => 卡().length === 期望.全部 && 站况() === '异兽部 · ' + 期望.全部 + ' 条', '点「全部」恢复全量');
+    断('A10 清空恢复：卡片数', 卡().length, 期望.全部);
+    断('A11 清空恢复：站况回到无筛选', 站况(), '异兽部 · ' + 期望.全部 + ' 条');
+    断('A12 清空恢复：aria-pressed 复位', 名表.map(按态), ['true', 'false', 'false', 'false', 'false']);
+
+    /* ── A 组：无障碍（余力加练） ─────────────────────────── */
+    const 钮们 = chips();
+    断真('A13 chip 是原生 button（type=button）', 钮们.every(b => b.tagName === 'BUTTON' && b.type === 'button'),
+      钮们.map(b => b.tagName + '·' + b.type).join(' / '));
+    断真('A14 chip 可 Tab 到（tabIndex ≥ 0）', 钮们.every(b => b.tabIndex >= 0),
+      'tabIndex = ' + 钮们.map(b => b.tabIndex).join(','));
+    断真('A15 计数徽标是纯数字（读屏读得到条数）', 钮们.every(b => /^\d+$/.test(徽标(b))),
+      '徽标 = ' + 钮们.map(徽标).join(','));
+    框.focus(); 找钮('吉祥').focus();
+    断真('A16 键盘聚焦能落到 chip 上', 档().activeElement === 找钮('吉祥'),
+      'activeElement = ' + (档().activeElement ? (档().activeElement.className || 档().activeElement.tagName) : '(空)'));
+    const 环 = 档().defaultView.getComputedStyle(找钮('吉祥'));
+    软断言.push({
+      项: 'A17 焦点环（软断言，环境相关）',
+      通过: 环.outlineStyle !== 'none' && parseFloat(环.outlineWidth) >= 2,
+      详情: 'outline: ' + 环.outlineStyle + ' ' + 环.outlineWidth + ' ' + 环.outlineColor
+    });
+    找钮('吉祥').click();
+    await 等(() => 卡().length === 期望.吉祥, '点掉「吉祥」');
+    找钮('全部').click();
+    await 等(() => 卡().length === 期望.全部, '回到全部');
+
+    /* ── B 组：无结果（只在夹具轮跑） ─────────────────────── */
+    if (夹具) {
+      const 灾 = 找钮('灾祸');
+      断('B1 0 条值：徽标为 0', 徽标(灾), '0');
+      断真('B2 0 条值：只弱化不禁用',
+        !!灾 && 灾.dataset.空 === '1' && 灾.disabled === false && 灾.getAttribute('aria-disabled') !== 'true',
+        'dataset.空 = ' + (灾 && 灾.dataset.空) + ' · disabled = ' + (灾 && 灾.disabled) + ' · aria-disabled = ' + (灾 && 灾.getAttribute('aria-disabled')));
+      灾.click();
+      await 等(() => 档().querySelector('#视图台 .zero') && 站况().indexOf('筛选无结果') >= 0, '点 0 条值后出筛空面板');
+      const 面板 = 档().querySelector('#视图台 .zero');
+      const 出口 = 面板.querySelector('.bu');
+      断('B3 筛空面板：卡片清零', 卡().length, 0);
+      断('B4 筛空面板：站况说明无结果', 站况(), '异兽部 · 筛选无结果');
+      断真('B5 筛空面板：说清是哪种筛法空的', /灾祸/.test((面板.querySelector('.zero-msg') || {}).textContent || ''),
+        (面板.querySelector('.zero-msg') || {}).textContent);
+      断真('B6 筛空面板：给出出路（清除筛选）', !!出口 && /清除筛选/.test(出口.textContent),
+        出口 ? 出口.textContent : '(没有出口按钮)');
+      出口.click();
+      await 等(() => 卡().length === 期望.全部 && 站况() === '异兽部 · ' + 期望.全部 + ' 条', '点出口恢复全量');
+      断('B7 出口生效：卡片数回到全量', 卡().length, 期望.全部);
+      断('B8 出口生效：灾祸取消选中', 按态('灾祸'), 'false');
+    }
+  } catch (因) {
+    记('探针整体', false, String((因 && 因.message) || 因));
+  }
+  收尾();
+})();
+</script>
+</body>
+</html>

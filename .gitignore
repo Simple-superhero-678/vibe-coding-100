@@ -19,7 +19,11 @@ npm-debug.log*
 Thumbs.db
 
 # WorkBuddy 本地工作数据（含每日工作日志，属工具数据不入库）
-.workbuddy/
+# 注意必须写 .workbuddy/* 而不是 .workbuddy/ —— 父目录被整目录排除时，
+# !.workbuddy/skills/ 这类例外不会生效（git 的硬规则）。
+.workbuddy/*
+# 例外：项目级 Skill 属项目约定（Day 12 起），要入库
+!.workbuddy/skills/
 
 # 打卡上传中间产物（含 ima COS 临时凭证 JSON，绝不入库）
 checkin/_build/
