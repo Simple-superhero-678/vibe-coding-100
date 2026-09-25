@@ -34,6 +34,23 @@
 .seek:focus{border-bottom-color:var(--cinnabar)}   /* 全站唯一动的一笔 */
 .seek::-webkit-search-cancel-button{-webkit-appearance:none}
 
+/* —— 中间宽度：搜索框折到独立一行（Day 10 修）——
+   [问题] 721–1080px 是一段「桌面排版、但宽度已经不够」的裂缝：
+          .bu-tabs（420px）与 .bu-fav（85.5px）都是 flex:none —— 不让位；
+          只有 .seek 是 flex:1 —— 吃残值。于是窗口越窄，被压的全是搜索框。
+          实测 760px 视口搜索框只剩 102px（约 5 个汉字），占位文字被截断 171px；
+          900px 视口剩 242px，占位同样显示不全。（1536/1180 档为 422px，正常。）
+   [为什么是 1080] 1080 = --shell 容器的设计宽。窄于它，这一行本来就装不下
+          「搜索框 + 五个部按钮 + 收藏」（420 + 85.5 + 32×2 gap 之后已无可用输入宽）。
+   [做法] 把原先只写在 ≤720px 里的「折行」规则提到这里 —— 早一档折，搜索框独占整行。
+          手机上本来就是两行，所以这里不引入新形态，只是让桌面/手机的界线落在正确的位置。
+   [代价] 1080 以下首屏多约 41px（搜索区由一行变两行）。
+          ≥1081px 与 ≤720px 的渲染结果均不变 —— 改动只影响夹在中间的这段。 */
+@media(max-width:1080px){
+  .finder-inner{flex-wrap:wrap;gap:14px}
+  .finder-inner .seek{flex-basis:100%}
+}
+
 /* —— 五部 tab（F2 的入口；异兽本位，其余四部 M6 补数据） —— */
 .bu-tabs{display:flex;flex-wrap:wrap;gap:10px;flex:none}
 .bu{
@@ -315,8 +332,7 @@
 /* —— 手机宽度：单列，不横向滚动（PRD 8.6 / 9.2 ④） —— */
 @media(max-width:720px){
   .finder{margin-top:12px;padding:8px 0 10px}
-  .finder-inner{flex-wrap:wrap;gap:14px}      /* 搜索框与 tab 一条挤不下，落回两行 */
-  .finder-inner .seek{flex-basis:100%}
+  /* 搜索框与 tab 的折行规则已提到 ≤1080px 那一段（Day 10），这里不再重复 */
   .seek{font-size:17px}
   .bu-tabs{flex:1 1 100%;gap:8px}              /* 落到自己一行并占满，避免溢出容器 */
   .bu{font-size:13px;padding:7px 11px 7px 13px;letter-spacing:.12em}
