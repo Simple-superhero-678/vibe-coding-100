@@ -29,6 +29,26 @@
   padding:22px 26px 16px;
   border-bottom:1px solid var(--hairline);
 }
+/* 面包屑（Day 13）：名字上方的「所在位置」。
+   一行里只有「部」可点（朱砂），当前条目是死的文字 —— 位置信息不该全是按钮。
+   刻意不加背景、不做胶囊：这一行只需要回答「我在哪」，多一分装饰都在跟名字抢注意力。 */
+.detail-crumb{
+  display:flex;align-items:center;gap:8px;
+  margin:0 0 9px;
+  font-family:var(--serif);font-size:12.5px;letter-spacing:.14em;
+  color:var(--ink-2);
+}
+.crumb-bu{
+  font:inherit;letter-spacing:inherit;
+  color:var(--cinnabar);
+  background:none;border:0;padding:0;
+  border-bottom:1px solid transparent;
+  cursor:pointer;
+  transition:border-color .16s;
+}
+.crumb-bu:hover{border-bottom-color:var(--cinnabar)}
+.crumb-sep{opacity:.5}
+.crumb-here{color:var(--ink-2)}
 .detail-name{
   margin:0;
   font-family:var(--serif);font-weight:400;
@@ -351,9 +371,10 @@ span.fav-open:hover .fav-name{color:var(--ink-2)}
 }
 .fav-remove:hover{color:var(--cinnabar);border-color:var(--cinnabar)}
 
-.fav-empty{padding:20px 0 26px;border-left:2px solid var(--cinnabar);padding-left:16px}
-.fav-empty-msg{margin:0;font-family:var(--serif);font-size:15px;letter-spacing:.1em;color:var(--ink)}
-.fav-empty-lead{margin:8px 0 0;font-size:13px;line-height:1.9;color:var(--ink-2)}
+/* 浮层里的「加载中」：骨架整套复用视图台的（.skeleton / .sk-line / .sk-hint），
+   只把 margin-top 收掉 —— 视图台那个 18px 是为了与上方工具条拉开，
+   而面板头部本来就有 .panel-hint 占着一行。 */
+.fav-skeleton{margin-top:0}
 
 /* —— 收藏入口（F5）——
    与五部 tab 挤在同一行，但刻意不同形：部 tab 用墨色实底表示「正在看这一部」，

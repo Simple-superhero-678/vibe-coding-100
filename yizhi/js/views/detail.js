@@ -14,7 +14,7 @@
 //     （PRD 9.2 ③：缺项明示，不用空白糊弄）。
 
 import { 建图 } from './portrait.js';
-import { 关闭请求, 收藏切换, 导出请求 } from '../events.js';
+import { 关闭请求, 收藏切换, 导出请求, 回部请求 } from '../events.js';
 import { 建行 } from './card.js';
 
 /* 事件名集中在 js/events.js：这里是「发」的一端，main.js 是「听」的一端。 */
@@ -119,6 +119,44 @@ function 建用法(条) {
   return 块;
 }
 
+/* —— 面包屑（Day 13 余力加练）——
+   「异兽部 › 九尾狐」：把这一条在站里的位置写出来。
+
+   为什么第 13 天要补它：以前详情是个浮层，关掉就回到「刚才那个地方」，
+   位置感由上下文提供。现在详情有了自己的地址（#/条/yishou-001），
+   **直接粘地址进来的人可能压根没经过异兽部** —— 只看到一条孤零零的条目，
+   不知道自己在哪、也不知道这一部还有没有别的。面包屑就是给这种情况兜底的。
+
+   部名做成按钮而不是纯文字：点一下回那一部的浏览，这样「返回上一层」有了可见入口
+   （浏览器的后退键也能回，但刚打开链接的人手里没有可退的历史）。 */
+function 建面包屑(条) {
+  const 条带 = document.createElement('nav');
+  条带.className = 'detail-crumb';
+  条带.setAttribute('aria-label', '所在位置');
+
+  const 部 = document.createElement('button');
+  部.type = 'button';
+  部.className = 'crumb-bu';
+  部.textContent = `${条.部}部`;
+  部.setAttribute('aria-label', `回到${条.部}部浏览`);
+  部.addEventListener('click', () => {
+    条带.dispatchEvent(new CustomEvent(回部请求, { bubbles: true, detail: { 部: 条.部 } }));
+  });
+
+  const 隔 = document.createElement('span');
+  隔.className = 'crumb-sep';
+  隔.setAttribute('aria-hidden', 'true');
+  隔.textContent = '›';
+
+  const 此 = document.createElement('span');
+  此.className = 'crumb-here';
+  此.setAttribute('aria-current', 'page');
+  此.textContent = 条.名;
+
+  条带.append(部, 隔, 此);
+  return 条带;
+}
+
 /* —— 面板 —— */
 
 /**
@@ -134,9 +172,11 @@ export function renderDetail(条) {
   /* 无障碍名：读屏念「九尾狐，对话框」比念「对话框」有用得多 */
   面板.setAttribute('aria-label', `${条.名} 详情`);
 
-  /* —— 头：名 + 别名 + 归属 —— */
+  /* —— 头：面包屑 + 名 + 别名 + 归属 —— */
   const 头 = document.createElement('header');
   头.className = 'detail-head';
+
+  头.append(建面包屑(条));
 
   const 名 = document.createElement('h2');
   名.className = 'detail-name';

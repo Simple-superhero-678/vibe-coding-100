@@ -251,6 +251,10 @@
 .zero-msg{margin:0;font-family:var(--serif);font-size:15px;letter-spacing:.1em;color:var(--ink)}
 .zero-lead{margin:8px 0 0;font-size:12.5px;color:var(--ink-2)}
 .zero-near{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 16px}
+/* 说明句后面直接跟出口按钮时，给一点间距 ——
+   零结果那块中间还夹着「相近条目」，靠它自己的外边距已经隔开，
+   所以这里用相邻兄弟选择器，只补「说明 → 按钮」这一种排法（Day 13 三处空态）。 */
+.zero-lead + .bu{margin-top:14px}
 .near{
   appearance:none;-webkit-appearance:none;
   font-family:var(--serif);

@@ -8,28 +8,25 @@
 // 列表项做成可点的 —— 收藏夹里看到一条想去看看，不该逼人回到网格里再搜一遍。
 
 import { 打开请求, 收藏切换 } from '../events.js';
-import { 建行 } from './card.js';
 
 /**
  * 画收藏列表。容器内容会被整体替换。
+ *
+ * Day 13 起**只画列表**：0 条时清空容器并返回 0，不再自己铺空态。
+ * 理由：收藏夹现在有四种状态（加载中 / 有列表 / 空 / 没读到），它们要判的东西
+ * （哪一部没读到、有几条、出口按钮点下去怎么走）全都是装配层的事。
+ * 摊在两边写，迟早一个说「空着」、一个说「没读到」，而这两句的出路完全不同。
+ *
  * @param {HTMLElement} 容器
  * @param {object[]} 条目 已收藏的条目（顺序即 store.list() 的顺序）
- * @returns {number} 实际画出的条数
+ * @returns {number} 实际画出的条数（0 表示调用方该自己铺空态）
  */
 export function renderFavList(容器, 条目) {
   const 列表 = Array.isArray(条目) ? 条目 : [];
 
   容器.textContent = '';
 
-  /* 空态：说清怎么让它不空，而不是留一句「暂无数据」（PRD 8.6 禁占位文字） */
-  if (!列表.length) {
-    const 块 = document.createElement('div');
-    块.className = 'fav-empty';
-    块.append(建行('fav-empty-msg', '收藏夹还空着。'));
-    块.append(建行('fav-empty-lead', '打开任意一条的详情，点「收藏」，它就会出现在这里。'));
-    容器.append(块);
-    return 0;
-  }
+  if (!列表.length) return 0;
 
   const 表 = document.createElement('ul');
   表.className = 'fav-list';
