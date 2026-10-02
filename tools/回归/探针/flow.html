@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>回归探针 · 收藏与详情链路</title>
+</head>
+<body>
+<div id="框"></div>
+<img src="/__never" alt="" width="1" height="1">
+<script>
+/* 契约（与 tools/回归/flow-check.py 配对，改一边必须改另一边）
+   固定跑一条链路，不用 URL 参数：
+     预置 2 条收藏（异兽·九尾狐 + 妖怪·蜘蛛精）
+     → 进 #/藏（面板开、2 条）
+     → 取消九尾狐那一条（列表 1 条、计数 1、存储 1）
+     → 关面板（地址收回 #/部/异兽）
+     → 点网格第一张卡开详情（地址变 #/条/yishou-001）
+     → 详情里点「收藏」（计数回到 2、存储 2）
+     → 点「收起」（详情关、地址收回 #/部/异兽）
+
+   这六步验的是两条最容易悄悄坏掉的链：
+     ① 取消收藏后面板要立刻跟着变（播藏 / 同步收藏 收敛到 铺收藏 之后）；
+     ② 关掉浮层要把地址收回来（靠 dialog 的 close 回调 —— 元素先 remove() 就不派发了）。
+
+   ⚠️ 必须带 --force-prefers-reduced-motion 跑（flow-check.py 已加）：
+      否则点卡片先播 3 秒云中仙槎转场，探针会抢在详情挂载之前读 DOM。
+   ⚠️ 等待一律按迭代次数让出，不用 Date.now() 计时。
+*/
+(async () => {
+  const 记 = [];
+  const 让出 = async (次) => {
+    for (let i = 0; i < 次; i++) await new Promise(r => setTimeout(r, 16));
+  };
+  const 等到 = async (判, 次 = 800) => {
+    for (let i = 0; i < 次; i++) {
+      try { if (判()) return true; } catch (e) { /* iframe 还没就绪 */ }
+      await new Promise(r => setTimeout(r, 16));
+    }
+    return false;
+  };
+
+  const 框 = document.createElement('iframe');
+  框.width = 1180;
+  框.height = 900;
+
+  const 取文 = () => 框.contentDocument;
+  const 平 = (el) => el ? String(el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+  const 址 = () => decodeURIComponent((取文() && 取文().location.hash) || '');
+  const 条数 = () => 取文().querySelectorAll('.fav-item').length;
+  const 计数 = () => 平(取文().getElementById('收藏计数'));
+  const 存储数 = () => {
+    /* ⚠️ 读顶层 localStorage，不要写 contentDocument.localStorage ——
+       `localStorage` 挂在 window 上，document 上没有这个属性，读到的是 undefined，
+       再取 .getItem 就抛 TypeError。而探针页与 iframe 同源，存储本来就是同一份。
+       （2026-10-02 重建探针时踩过：11 条断言里只有这两条挂，看着像"取消收藏没落盘"。） */
+    try { return JSON.parse(localStorage.getItem('yishou.fav.v1') || '[]').length; }
+    catch (因) { return '读不到(' + String((因 && 因.name) || 因) + ')'; }
+  };
+  const 面板开 = () => !!(取文().getElementById('收藏面板') || {}).open;
+  const 详情开 = () => !!取文().querySelector('dialog.detail[open]');
+
+  try {
+    localStorage.setItem('yishou.fav.v1', JSON.stringify(['yishou-001', 'yaoguai-003']));
+    框.src = 'index.html#/藏';
+    document.getElementById('框').append(框);
+
+    // ① 进收藏夹：面板开 + 2 条
+    await 等到(() => 面板开() && 条数() === 2);
+    await 让出(20);
+    记.push('A=进藏后条数:' + 条数());
+
+    // ② 取消九尾狐（网格第一张卡就是它）
+    取文().querySelector('.fav-item[data-id="yishou-001"] .fav-remove').click();
+    await 等到(() => 条数() === 1);
+    await 让出(20);
+    记.push('B=取消后条数:' + 条数());
+    记.push('C=取消后计数:' + 计数());
+    记.push('D=取消后存储:' + 存储数());
+
+    // ③ 关收藏面板 → 地址收回部浏览
+    取文().getElementById('关收藏').click();
+    await 等到(() => !面板开());
+    await 让出(20);
+    记.push('E=关面板后地址:' + 址());
+    记.push('F=关面板后面板开:' + 面板开());
+
+    // ④ 点网格第一张卡 → 开详情（地址应变深链）
+    取文().querySelector('#视图台 [data-id]').click();
+    await 等到(() => 详情开());
+    await 让出(20);
+    记.push('G=详情地址:' + 址());
+
+    // ⑤ 详情里点「收藏」→ 计数回到 2
+    取文().querySelector('dialog.detail .act-fav').click();
+    await 等到(() => 计数() === '2');
+    await 让出(20);
+    记.push('H=详情收藏后计数:' + 计数());
+    记.push('K=详情收藏后存储:' + 存储数());
+
+    // ⑥ 点「收起」→ 详情关 + 地址收回
+    取文().querySelector('dialog.detail .act-close').click();
+    await 等到(() => !详情开());
+    await 让出(20);
+    记.push('I=收详情后地址:' + 址());
+    记.push('J=收详情后详情开:' + 详情开());
+  } catch (因) {
+    记.push('探针出错=' + String((因 && 因.message) || 因));
+  }
+
+  document.body.setAttribute('data-result', 记.join(' ;; '));
+})();
+</script>
+</body>
+</html>

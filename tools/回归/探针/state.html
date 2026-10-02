@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>回归探针 · 四种状态</title>
+</head>
+<body>
+<div id="框"></div>
+<!-- 永不返回的资源：把 load 钉住，好让 --timeout 在真实时间上取样（见 _壳.py 造服务） -->
+<img src="/__never" alt="" width="1" height="1">
+<script>
+/* 契约（与 tools/回归/state-check.py 配对，改一边必须改另一边）
+   URL 参数：
+     路由 = 目标 hash，如 #/部/异兽
+     态   = 慢 | 错 | 空（不传 = 正常）
+     预置 = 逗号分隔的收藏 id，如 yishou-001,yaoguai-003（不传 = 清空收藏）
+   产出：<body data-result="…">，一串「字段=值」，用 ' ;; ' 分隔。
+   字段：台class / 台文 / 列文 / 站况 / 骨架 / 面板开
+
+   为什么探针只「等」和「抄」：--dump-dom 的取样点在 load 那一刻，而数据是异步读的，
+   直接 dump 会同一档两轮红绿交替。这里等到渲染稳定再抄出来，
+   判定（含/不含哪些片段）全留给 python —— 探针一旦自己下结论，错了就看不出来。
+
+   ⚠️ 等待一律按「迭代次数让出」，不用 Date.now() 计时：虚拟时间会快进计时器，
+      真卡住时它已经判定超时了，看着像产品没渲染。
+*/
+(async () => {
+  const 参 = new URLSearchParams(location.search);
+  const 路由 = 参.get('路由') || '#/部/异兽';
+  const 态 = 参.get('态') || '';
+  const 预置 = 参.get('预置') || '';
+  const 结 = [];
+
+  const 让出 = async (次) => {
+    for (let i = 0; i < 次; i++) await new Promise(r => setTimeout(r, 16));
+  };
+  const 等到 = async (判, 次 = 800) => {
+    for (let i = 0; i < 次; i++) {
+      try { if (判()) return true; } catch (e) { /* iframe 还没就绪，下一轮再试 */ }
+      await new Promise(r => setTimeout(r, 16));
+    }
+    return false;
+  };
+
+  const 框 = document.createElement('iframe');
+  框.width = 1180;
+  框.height = 900;
+
+  const 取文 = () => 框.contentDocument;
+  const 平 = (el) => el ? String(el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+  const 骨 = (el) => !!el && !!el.querySelector('.skeleton');
+  const 是藏 = 路由.indexOf('#/藏') === 0;
+
+  try {
+    const 键 = 'yishou.fav.v1';
+    if (预置) localStorage.setItem(键, JSON.stringify(预置.split(',').filter(Boolean)));
+    else localStorage.removeItem(键);
+
+    框.src = 'index.html' + (态 ? '?态=' + encodeURIComponent(态) : '') + 路由;
+    document.getElementById('框').append(框);
+
+    /* 稳定判据（两轮红绿交替的元凶就是它，别改弱）：
+       · 慢态**就等骨架** —— 骨架正是这一档要拍的东西，等「不读取中」会抓到空帧
+       · 其余态等「骨架消失且已有内容」—— 骨架消失 = 数据到位，内容非空 = 已铺完
+       · #/藏 还要等面板打开（收藏是浮层，视图台可能还留着上一部的内容） */
+    await 等到(() => {
+      const 文 = 取文();
+      if (!文 || !文.body) return false;
+      const 台 = 文.getElementById('视图台');
+      const 列 = 文.getElementById('收藏列表');
+      const 板 = 文.getElementById('收藏面板');
+      const 有骨 = 骨(台) || 骨(列);
+      if (态 === '慢') return 是藏 ? (有骨 && !!(板 && 板.open)) : 有骨;
+      const 台好 = !!台 && !骨(台) && 台.textContent.trim().length > 0;
+      const 列好 = !!列 && !骨(列) && 列.textContent.trim().length > 0;
+      /* #/藏 是浮层：必须等**面板已经打开**且列表有了终态内容。
+         等错方向（比如写成「面板关着」）不会报错，只会一路空转到超时，
+         然后 Edge 取样时 data-result 还没写出来 —— 现场一片空白（2026-10-02 踩过）。 */
+      return 是藏 ? (!!(板 && 板.open) && 列好) : 台好;
+    });
+
+    await 让出(40);   // 再等异步副作用落定：图 404 回退公开图、面板二次渲染
+
+    const 文 = 取文();
+    const 台 = 文.getElementById('视图台');
+    const 列 = 文.getElementById('收藏列表');
+    const 板 = 文.getElementById('收藏面板');
+
+    结.push('台class=' + (台 ? 台.className : '(没有)'));
+    结.push('台文=' + 平(台).slice(0, 400));
+    结.push('列文=' + 平(列).slice(0, 400));
+    结.push('站况=' + 平(文.getElementById('站况')));
+    结.push('骨架=' + (骨(台) || 骨(列) ? '有' : '无'));
+    结.push('面板开=' + !!(板 && 板.open));
+  } catch (因) {
+    结.push('探针出错=' + String((因 && 因.message) || 因));
+  }
+
+  document.body.setAttribute('data-result', 结.join(' ;; '));
+})();
+</script>
+</body>
+</html>

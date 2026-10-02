@@ -115,6 +115,7 @@ vibe coding打卡学习/          ← 仓库根
     │   ├── store.js          ← 收藏层：localStorage 读写 + 导出文本
     │   ├── transit.js        ← 转场层：云中仙槎，可中断
     │   ├── events.js         ← 视图层 → 装配层的四个事件名（只写一处，免得两边写岔）
+│   ├── router.js         ← 路由层：地址栏 ⇄ 页面状态（hash 方案，Day 13；不认五部，只认第一段是哪个词）
     │   └── views/
     │       ├── grid.js       ← 异兽网格 + 吉凶筛选谓词
     │       ├── tree.js       ← 神仙谱系树（两级）
