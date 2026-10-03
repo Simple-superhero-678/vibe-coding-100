@@ -187,6 +187,28 @@
 }
 .portrait-empty{border:1px solid var(--hairline)}   /* 图缺失时的安静空框，不出破图标 */
 
+/* —— 画心加载态（Day 14 最小修复）——
+   出图前先在画框里铺三行淡墨线（与切部骨架同一套观感），出图即消失。
+   为什么要它：同伴在移动网络下看到的是一排空图框，而他分不清「正在下载」与「这条没有图」——
+   原来的 .portrait（加载中）和 .portrait-empty（没图）是同款空框，肉眼无差。
+   三态由此可分：淡墨线 = 加载中 ｜ 出图 = 有 ｜ 空框 = 没有。
+   注意：<img> 是替换元素，::before/::after 不渲染，骨架只能用 background 画。 */
+.portrait:not(.is-loaded){
+  background-image:
+    linear-gradient(var(--hairline), var(--hairline)),
+    linear-gradient(var(--hairline), var(--hairline)),
+    linear-gradient(var(--hairline), var(--hairline));
+  background-size:46% 1px, 60% 1px, 36% 1px;
+  background-position:50% 41%, 50% 50%, 50% 59%;
+  background-repeat:no-repeat;
+  animation:portrait-wait 1.5s ease-in-out infinite;
+}
+@keyframes portrait-wait{0%,100%{opacity:.5} 50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  /* 光写 animation:none 不够 —— 必须给出一个明确的静态终态，别让元素停在哪一帧看运气 */
+  .portrait:not(.is-loaded){animation:none;opacity:.7}
+}
+
 .card-body{min-width:0}
 .card-name{
   margin:0;

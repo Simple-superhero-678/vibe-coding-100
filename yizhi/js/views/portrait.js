@@ -39,6 +39,13 @@ export function 建图(条) {
   图.alt = 条.名;
   图.src = 图源 + 条.图 + '.webp';
 
+  /* —— 加载态（Day 14 最小修复）——
+     同伴在移动网络下看到的是「一排空图框」，而他分不清这是「还在下载」还是「这条本来没有图」。
+     出图前不挂 is-loaded，由 CSS 在画框里铺三行淡墨线；出图后骨架自己消失。
+     注意：img 是替换元素，::before/::after 不渲染，骨架只能用 background 画。 */
+  图.addEventListener('load', () => 图.classList.add('is-loaded'));
+  if (图.complete) 图.classList.add('is-loaded');   // 缓存命中时 load 可能早于上面的监听注册
+
   图.addEventListener('error', () => {
     if (图源 === 私有图目录 && !图.dataset.已回退) {
       图.dataset.已回退 = '1';
