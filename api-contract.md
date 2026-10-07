@@ -1,8 +1,9 @@
 # API 契约（api-contract.md）
 
-> **状态：Day 15 登记占位 —— 一个都没实现。**
+> **状态：Day 16 —— 数据表已建（`db/schema.sql`），接口仍为占位。**
 > 这份文件是**第 3 周（Day 16 起）建表与写接口的唯一依据**，接口形状以此为准，实现见各自的 Day。
-> 今天（Day 15）只有 `GET /api/health` 真跑通了，它已按本契约的通用约定编写，作为格式的活样本。
+> 已完成：`GET /api/health`（Day 15）· `users` / `favorites` 两张表 + 种子数据（Day 16，脚本在 `db/`）。
+> ⚠️ **表结构的唯一真源是本文件 §2**。改表的顺序：**先改这里 → 再改 `db/schema.sql` → 再到控制台执行**，否则契约与数据库会漂移。
 
 ---
 
@@ -14,8 +15,11 @@
 | 前端在线地址 | `https://yishou-d9gyoykka49fb0634-1501173044.tcloudbaseapp.com/cbsite/`（CloudBase 静态托管） |
 | 接口基址（Base URL） | `https://yishou-d9gyoykka49fb0634-1501173044.ap-shanghai.app.tcloudbase.com`（CloudBase HTTP 网关） |
 | 环境 ID | `yishou-d9gyoykka49fb0634` |
+| 后端形态 | **B2 · 云函数 + 云数据库**（Day 16 定案，见 §5） |
+| 数据库 | CloudBase **PostgreSQL**（「SQL 型数据库」，schema `public`） |
+| 已建数据表 | `users` / `favorites`（Day 16；脚本 `db/schema.sql` + `db/seed.sql`，步骤见 `db/README.md`） |
 | 已实现接口 | `GET /api/health`（Day 15） |
-| 未处理 | ⚠️ **跨域**：静态页域名与接口域名不同（`tcloudbaseapp.com` → `app.tcloudbase.com`），Day 16–20 配 CORS |
+| 未处理 | ⚠️ **RLS 未配**（CloudBase PG 的 `public` schema 可被 PostgREST 访问，权限需靠 RLS 兜住）· ⚠️ **跨域**：静态页域名与接口域名不同（`tcloudbaseapp.com` → `app.tcloudbase.com`），Day 16–20 配 CORS |
 
 页面需要后端的原因只有一个：**收藏现在只存在浏览器本地（localStorage），换设备就没了**。除此之外的读取（五部 JSON）都是静态文件，不需要接口。
 
@@ -64,33 +68,38 @@
 
 ---
 
-## 2. 数据表（第 3 周建表时照这个建）
+## 2. 数据表（Day 16 已建 · 建表脚本 `db/schema.sql`）
 
 字段定义与理由见 `TECH_DESIGN-后端预备方案.md` §4，这里只列接口要用到的部分。
 
+👉 **本节的表结构＝数据库里的实际结构（Day 16 已对齐）**。建表脚本、种子数据、控制台执行与验证步骤见 `db/README.md`。
+
 ### 2.1 `users` — 用户
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | uuid / 主键 | 平台生成 |
-| `provider` | text | 登录来源，如 `github` / `anonymous` |
-| `provider_uid` | text | 第三方的唯一 id |
-| `nickname` | text / 可空 | 界面显示用 |
-| `created_at` | timestamptz | 首次登录时间 |
+| 字段 | 类型 | 默认 / 约束 | 说明 |
+|---|---|---|---|
+| `id` | uuid | 主键，`DEFAULT gen_random_uuid()` | 平台生成 |
+| `provider` | text | `NOT NULL` + 非空白 CHECK | 登录来源，如 `github` / `anonymous` |
+| `provider_uid` | text | `NOT NULL` + 非空白 CHECK | 第三方的唯一 id |
+| `nickname` | text | 可空 | 界面显示用 |
+| `created_at` | timestamptz | `NOT NULL DEFAULT now()` | 首次登录时间 |
 
+**约束**：`UNIQUE (provider, provider_uid)` —— 同一个人重复登录不建第二行（Day 16 加，v0.1 未写）。
+**索引**：无额外索引（主键 + 上面这个唯一约束已够）。
 **不存**：密码、手机号、邮箱、真实姓名。一个都不存。
 
 ### 2.2 `favorites` — 收藏（核心表）
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | uuid / 主键 | 行主键 |
-| `user_id` | uuid / 外键 → `users.id` | 谁的收藏 |
-| `entry_id` | text | 条目 id（如 `yishou-001`），**与 `data/*.json` 里的 `id` 完全一致** |
-| `created_at` | timestamptz | 收藏时间，列表按它排序 |
+| 字段 | 类型 | 默认 / 约束 | 说明 |
+|---|---|---|---|
+| `id` | uuid | 主键，`DEFAULT gen_random_uuid()` | 行主键 |
+| `user_id` | uuid | `NOT NULL`，外键 → `users.id`，`ON DELETE CASCADE` | 谁的收藏 |
+| `entry_id` | text | `NOT NULL`，长度 1–64 且非空白 | 条目 id（如 `yishou-001`），**与 `data/*.json` 里的 `id` 完全一致** |
+| `created_at` | timestamptz | `NOT NULL DEFAULT now()` | 收藏时间，列表按它排序 |
 
-- **唯一索引**：`(user_id, entry_id)` —— 防重复收藏。
-- **索引**：`user_id`（查询永远按用户查）。
+- **唯一约束**：`UNIQUE (user_id, entry_id)` —— 防重复收藏。⚠️ 这不只是「防手滑」：它是 `409 FAV_DUPLICATE` 的**数据层保证**，光靠云函数写 `if (已收藏)` 在并发下会双插。
+- **索引**：⚠️ **不单独建 `user_id` 索引**（v0.1 原写「给 `user_id` 建索引」，Day 16 修正）—— 上面的唯一约束已生成一个**以 `user_id` 为前导列**的索引，「按 `user_id` 查」直接命中；再建单列索引是纯冗余（白占空间、拖慢写入）。
+- **删除行为**：`ON DELETE CASCADE` —— 注销用户时数据库自动删掉他的全部收藏（§3.4 要的行为），不用云函数写两条删语句、也就不会漏删留脏数据。
 - ⚠️ `entry_id` **不建外键**：条目不在数据库里（真源是 `data/*.json`）。后果是可能指向已删除的条目 → **接口不做校验**，前端显示「此条已下架」并允许移除（`TECH_DESIGN.md` §12.4 已有该态）。
 
 ### 2.3 `events` — 浏览/搜索埋点（**可选，今天不建**）
@@ -347,9 +356,11 @@
 
 ---
 
-## 5. 待定（今天不翻案，Day 16 建表前必须定）
+## 5. 后端形态（✅ Day 16 已定：**B2**）
 
-🔴 **B1 vs B2 —— 后端形态没定，本契约对两者都成立，但实现方式完全不同：**
+🔴 **已拍板：走 B2 · 云函数 + 云数据库。** 理由 = 环境 Day 15 已开通、且「数据库类型创建时选定**不可切换**」（已选 PostgreSQL）；改投 B1 要新注册一个平台、前面的环境作废重来，不划算。
+
+下表保留作对照（B1 仍未排除，只是本版不采用）：
 
 | | **B1 · 托管数据库 + 第三方登录**（`TECH_DESIGN-后端预备方案.md` §3 推荐） | **B2 · 云函数 + 云数据库**（Day 15 实际开通的 CloudBase 路线） |
 |---|---|---|
@@ -358,7 +369,8 @@
 | 与今天的关系 | 云函数只留 `health`，其余全走直连 | 3.2–3.10 每个都要写成云函数 |
 | 主要代价 | 要**新注册**一个平台账号；RLS 规则要写对，写错 = 数据裸奔 | 已开通、能立刻开工；但函数数量多、三处排错（浏览器 + 函数日志 + 数据库） |
 
-**建议**：Day 16 开工前给这个选择一个明确判断 —— 判据是「愿意为少写代码去新注册一个平台吗，还是用已开通的 CloudBase 一路走到底」。本契约的路径与 JSON 形状**两种都不用改**。
+**落地口径（B2）**：§3 的每个接口 = 一个**云函数**（第 0 个 `health` 已在 `cloudbase/functions/health/`）。本契约的路径与 JSON 形状两种形态都不用改 —— 换形态只换实现层，契约不动。
+**另需补**：RLS 策略（CloudBase PG 的 `public` schema 可被 PostgREST 直连，不配策略 = 权限不可控）+ HTTP 网关跨域设置。
 
 ---
 
@@ -366,4 +378,5 @@
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-10-07（Day 16） | v0.2 | §2 表结构与数据库对齐：`users` 加 `UNIQUE(provider, provider_uid)`；`favorites` 外键补 `ON DELETE CASCADE`、`entry_id` 补长度 CHECK、**修正索引口径（不单独建 `user_id` 索引）**；§0 补后端形态/数据库/已建表；§5 B1/B2 定案为 **B2**。实现见 `db/schema.sql` + `db/seed.sql`，步骤见 `db/README.md` |
 | 2026-10-07（Day 15） | v0.1 | 初版：登记 `users` / `favorites`（+ 两个可选表）与 10 个接口的占位，无实现。B1/B2 形态待定。 |
