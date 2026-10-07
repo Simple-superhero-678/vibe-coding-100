@@ -1,0 +1,7 @@
+{
+  "name": "yishou-favorites",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GET /api/favorites —— 收藏列表读取（CloudBase Web 函数）",
+  "dependencies": {}
+}

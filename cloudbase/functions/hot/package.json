@@ -1,0 +1,7 @@
+{
+  "name": "yishou-hot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GET /api/hot —— 收藏热门榜（CloudBase Web 函数）",
+  "dependencies": {}
+}
