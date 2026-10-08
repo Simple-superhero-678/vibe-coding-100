@@ -19,8 +19,8 @@
 | 后端形态 | **B2 · 云函数 + 云数据库**（Day 16 定案，见 §5） |
 | 数据库 | CloudBase **PostgreSQL**（「SQL 型数据库」，schema `public`） |
 | 已建数据表 | `users` / `favorites`（Day 16；脚本 `db/schema.sql` + `db/seed.sql`，步骤见 `db/README.md`） |
-| 已实现接口 | `GET /api/health`（Day 15）· `GET /api/favorites`、`GET /api/hot`（Day 17） |
-| 未处理 | ⚠️ **RLS 未配**（CloudBase PG 的 `public` schema 可被 PostgREST 访问，权限需靠 RLS 兜住）· ⚠️ **跨域**：Day 17 已在函数侧回 `access-control-allow-origin`，网关侧「跨域设置」仍待配（Day 18 前端接入时确认） |
+| 已实现接口 | `GET /api/health`（Day 15）· `GET /api/favorites`、`GET /api/hot`（Day 17）· **`POST /api/favorites`（Day 18）** |
+| 未处理 | ⚠️ **RLS 未配**（CloudBase PG 的 `public` schema 可被 PostgREST 访问，权限需靠 RLS 兜住）· ⚠️ **跨域**：Day 17 已在函数侧回 `access-control-allow-origin`，网关侧「跨域设置」仍待配（前端接入时确认） |
 
 页面需要后端的原因只有一个：**收藏现在只存在浏览器本地（localStorage），换设备就没了**。除此之外的读取（五部 JSON）都是静态文件，不需要接口。
 
@@ -33,10 +33,11 @@
 - **认证**：登录成功后拿到 token，之后每个请求带
   `Authorization: Bearer <token>`。
   未带 token 的请求按「未登录」处理（只有 `/api/health` 和 `/api/auth/*` 允许匿名）。
-  - 🔴 **Day 17 临时口径（Day 18 删）**：`/api/auth/session` 还没实现，所以**没有任何地方能签发真 token**。
-    为了让第一个读接口今天就能在浏览器地址栏里验证，`/api/favorites` 允许用
-    `?user_id=<uuid>` 顶替 token（请求头 `Authorization: Bearer <uuid>` 同样认）。
-    这不是设计，是**欠账**：Day 18 实现 `POST /api/auth/session` 后，这里恢复成「只认真 token」。
+  - 🔴 **临时口径：`?user_id=<uuid>` 顶替 token**（Day 17 立 · Day 18 的 `POST /api/favorites` 沿用）。
+    `/api/auth/session` 还没实现，**没有任何地方能签发真 token**，为了让读/写接口能在浏览器地址栏里直接验证，
+    `/api/favorites`（读与写都算）允许用 `?user_id=<uuid>` 顶替 token（请求头 `Authorization: Bearer <uuid>` 同样认）。
+    这不是设计，是**欠账**：**待 `POST /api/auth/session` 落地后删掉这一段**，恢复成「只认真 token」
+    （原定「Day 18 删」，Day 18 当天决定改用 `POST /api/favorites` 而不是 `auth/session`，故顺延）。
 - **字段命名**：响应与请求体一律 **`snake_case`**，与数据库字段同名（少一层映射，排错更快）。
 - **时间**：ISO 8601 UTC 字符串，如 `2026-10-06T16:00:00Z`。由服务端生成，前端不传。
 - **成功响应**：**一定**带 `"ok": true`。
@@ -141,8 +142,8 @@
 | `/api/me` | DELETE | 注销（连带删收藏） | 是 | 占位 |
 | **`/api/favorites`** | **GET** | **收藏列表读取（列表读取接口）** | 是（Day 17 临时 `user_id`） | ✅ **Day 17 已实现** |
 | **`/api/hot`** | **GET** | **收藏热门榜（Day 17 新增）** | 否 | ✅ **Day 17 已实现** |
-| `/api/favorites` | POST | 新增一条收藏 | 是 | 占位 |
-| `/api/favorites/{entry_id}` | DELETE | 取消一条收藏 | 是 | 占位 |
+| **`/api/favorites`** | **POST** | **新增一条收藏（写入接口）** | 是（Day 17 临时 `user_id`） | ✅ **Day 18 已实现** |
+| `/api/favorites/{entry_id}` | DELETE | 取消一条收藏 | 是 | 占位（第 4 周） |
 | `/api/favorites/sync` | PUT | 批量覆盖（本地收藏迁到账号） | 是 | 占位 |
 | `/api/events` | POST | 埋点（可选） | 否 | 占位 |
 | `/api/entries` | GET | 条目列表读取（可选） | 否 | 占位 |
@@ -274,23 +275,28 @@
 
 ---
 
-### 3.6 `POST /api/favorites` — 新增一条收藏
+### 3.6 `POST /api/favorites` — 新增一条收藏 ✅ 已实现（Day 18）
 
-- **认证**：是
+- **认证**：是（Day 18 沿用 Day 17 临时口径，见 §1）
 - **请求体**：
 
   ```json
   { "entry_id": "yishou-001" }
   ```
 
+- **请求校验**（一律先校验、后落库；错误信息**必须用中文说清「缺了什么 / 哪里不对」**）：
+  `entry_id` 缺失、非字符串、纯空白、超过 64 字符 → **`400 BAD_REQUEST`**；请求体不是合法 JSON → 同样 `400`。
+  例：`缺少必填字段：entry_id（条目 id，例如 yishou-001）` / `entry_id 最长 64 个字符，收到 65 个`
 - **响应 201**：
 
   ```json
   { "ok": true, "data": { "entry_id": "yishou-001", "created_at": "2026-10-06T16:00:00Z" } }
   ```
 
+  `created_at` 由**服务端**生成，形态与 §3.5 一致（ISO 8601 UTC、无毫秒、以 `Z` 结尾）；请求体里传了也会被忽略。
 - **幂等约定**：重复收藏返回 **`409 FAV_DUPLICATE`**，但**前端必须当成功处理**（`toggle` 是幂等的，用户连点两下不该看到报错）。
-- **错误**：`400 BAD_REQUEST`（缺 `entry_id` 或非字符串）、`401`、`409`、`500`
+  🔒 **防重复靠数据库唯一约束 `UNIQUE(user_id, entry_id)`，不是靠云函数里的「先查再插」** —— 并发下两个请求会同时通过检查、双双插入，只有数据库约束拦得住。函数负责把约束冲突（SQLSTATE `23505`）翻成 `409 FAV_DUPLICATE`。
+- **错误**：`400 BAD_REQUEST`（缺 `entry_id` / 非字符串 / 空白 / 超 64 字 / 体不是 JSON / `user_id` 不在 `users` 表）· `401 UNAUTHORIZED` · `405 METHOD_NOT_ALLOWED`（`PUT` / `PATCH` 等）· `409 FAV_DUPLICATE` · `500 INTERNAL`
 - **前端在哪用**：`store.js` 的 `toggle(id)` 中「加入收藏」那一支。
 
 ---
@@ -435,6 +441,7 @@
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-10-08（Day 18 · 部署实测） | v0.4 | **第一个写接口上线并通过公网验证**：§3.6 `POST /api/favorites` 标记已实现（与 `GET /api/favorites` 同一个云函数，按方法分流）。三条验证全部对上契约 —— 正常写入 `201` / 重复提交 `409 FAV_DUPLICATE` / 缺必填字段 `400` + 中文提示；数据库侧确认「写进去的读得出来」（`GET` 的 `total` 与表行数一致，重复请求不增行）。补记三处口径 —— ① §3.6 请求校验细则（空白 / 超 64 字 / 体非 JSON 一律 400，提示必须中文点名缺什么）；② §3.6 明确「防重复靠数据库唯一约束而非函数里的先查再插」；③ §1 临时认证口径由「Day 18 删」改为「**待 `POST /api/auth/session` 落地后删**」（Day 18 当天选择先做写接口，未做 auth）。§3 错误码补登 `405`。⚠️ **实测发现**：PG 网关口回的唯一冲突码是 `DATABASE_23505`（带前缀）而不是裸 `23505`，函数需归一化后再判，否则「重复收藏」会被当成 `500` 回给前端 —— 详细排错见 `cloudbase/README.md` |
 | 2026-10-07（Day 17 · 部署实测） | v0.3.1 | **两个读接口上线并通过公网验证**：`GET /api/favorites` / `GET /api/hot` 已挂到默认域名（HTTP 网关，上游类型 `WEB_SCF`）。**数据通路定案**：优先 CloudBase PG HTTP 网关 + 环境 API Key（`service_role`，仅服务端），`PG_URL` 配了则切回 `pg` 直连；§3.5 补记 `created_at` 归一化与 `total` 的两种取法。⚠️ 网关是 PostgREST 形态，**不支持 `GROUP BY`**，`/api/hot` 的聚合在函数内完成（契约 §3.11 记账）。实现与排错见 `cloudbase/README.md` |
 | 2026-10-07（Day 17） | v0.3 | **第一个读接口落地**：§3.5 `GET /api/favorites` 标记已实现（代码 `cloudbase/functions/favorites/index.web.js`），补记三处实现口径 —— ① `total` 需额外 `count(*)`（表里没有总数列）；② 排序补 `id` 兜底（`created_at` 非唯一键）；③ `created_at` 由 `to_char` 产出无毫秒 ISO 串。**新增 §3.11 `GET /api/hot`**（收藏热门榜，Day 17 拍板改口径：不接外部热搜）。**新增 §1 临时认证口径**（无 token 时认 `?user_id=`，Day 18 删）。§3 错误码补登 `405 METHOD_NOT_ALLOWED`。§0 更新已实现接口与 CORS 现状 |
 | 2026-10-07（Day 16） | v0.2 | §2 表结构与数据库对齐：`users` 加 `UNIQUE(provider, provider_uid)`；`favorites` 外键补 `ON DELETE CASCADE`、`entry_id` 补长度 CHECK、**修正索引口径（不单独建 `user_id` 索引）**；§0 补后端形态/数据库/已建表；§5 B1/B2 定案为 **B2**。实现见 `db/schema.sql` + `db/seed.sql`，步骤见 `db/README.md` |

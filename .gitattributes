@@ -1,0 +1,12 @@
+# Git 换行符规则（Day 18 立 · 血泪教训）
+#
+# `scf_bootstrap` 是交给 Linux 容器执行的启动脚本，**必须是 LF**。
+# 本机 core.autocrlf=true（Windows 常见默认），Git 会在 checkout 时把 LF 转成 CRLF，
+# 容器里就变成执行 `exec node index.web.js\r` —— `\r` 被当成文件名，node 找不到文件，
+# 容器起不来，函数线上恒回 443 且没有任何日志（2026-10-08 排查烧掉一整轮）。
+#
+# eol=lf 让 Git 无视 autocrlf 设置：无论谁 clone、切分支，取出来的都是 LF。
+cloudbase/functions/*/scf_bootstrap text eol=lf
+
+# 本规则文件自身也保持 LF，免得它自己被转坏
+.gitattributes text eol=lf

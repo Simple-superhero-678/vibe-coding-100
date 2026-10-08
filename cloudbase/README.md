@@ -20,7 +20,7 @@
 | 函数名 | 路由 | 认证 | 读什么 | 说明 |
 |---|---|---|---|---|
 | `health` | `GET /api/health` | 否 | 不连库 | 存活探针，只回 `{"ok":true,"service":"yishou"}`（Day 15） |
-| `favorites` | `GET /api/favorites` | 是（临时 `user_id`） | `public.favorites` | 收藏列表读取，支持 `limit`/`offset`（Day 17） |
+| `favorites` | `GET` + `POST` `/api/favorites` | 是（临时 `user_id`） | `public.favorites` | **读**：收藏列表读取，支持 `limit`/`offset`（Day 17）· **写**：新增一条收藏（Day 18，同一个函数按方法分流） |
 | `hot` | `GET /api/hot` | 否 | `public.favorites` 聚合 | 「收藏热门榜」：被收藏最多的条目 Top N（Day 17，口径见下） |
 
 > **关于 `hot` 的名字**：清单里的「热搜」是打卡课程模板（打卡 App 示例）的说法。本项目（异兽志）没有外部热搜需求，
@@ -54,6 +54,13 @@ tcb env apikey create yishou-server -e yishou-d9gyoykka49fb0634 --type api_key -
 - 🔴 这把 Key **只填在函数环境变量里，不写进仓库、不进 Git**（AGENTS §五.3）
 
 ### 第 1 步：部署函数
+
+🔴 **部署前必做**：自检启动脚本的换行符。**`scf_bootstrap` 必须是 LF，绝不能是 CRLF**
+（Windows 上编辑器 / Git 极易把它转成 CRLF，转了就线上 443，排查能烧掉一整轮 —— 详见「已知坑」第 1 条）。
+
+```bash
+grep -qU $'\r' scf_bootstrap && echo "🔴 CRLF，先修再部署！" || echo "✅ LF"
+```
 
 ⚠️ **必须 `cd` 进函数目录再执行** —— CLI 找 `scf_bootstrap` 看的是当前目录，`--dir` 只影响打包内容。
 
@@ -124,6 +131,34 @@ CLI 的 `fn deploy` 不带 `--env` 参数，环境变量走**管理接口**下�
 > 截图在 `tmp/day17-截图/`（`tmp/` 已 gitignore，作业证据不入库）。
 > ⚠️ 无头浏览器画不出**地址栏** —— 交给老师的图请在真浏览器里点开上面两条链接再截。
 
+### Day 18 实测（2026-10-08）：写接口上线
+
+`POST /api/favorites?user_id=11111111-1111-4111-8111-111111111111`，体 `{"entry_id":"shenxian-003"}`：
+
+| 场景 | HTTP | 响应 |
+|---|---|---|
+| 正常写入 | **201** | `{"ok":true,"data":{"entry_id":"shenxian-003","created_at":"2026-10-08T…Z"}}` |
+| 重复提交（同一条再来一次） | **409** | `{"ok":false,"error":{"code":"FAV_DUPLICATE","message":"该条目已在收藏中（同一用户重复收藏同一条会被拒绝）"}}` |
+| 缺必填字段（体 `{}`） | **400** | `{"ok":false,"error":{"code":"BAD_REQUEST","message":"缺少必填字段：entry_id（条目 id，例如 yishou-001）"}}` |
+| 体是空白串 `{"entry_id":"   "}` | **400** | `…"message":"entry_id 不能为空"` |
+
+数据库侧核对：`SELECT … FROM public.favorites WHERE user_id='1111…' ORDER BY created_at` —— 写一次多一行，**重复请求一行都不多**；同时 `GET /api/favorites` 的 `total` 与 `SELECT count(*)` 完全一致（写进去的读得出来）。
+
+**写测试命令的坑（本机 Windows 实测）**：⚠️ **PowerShell 里不要用 `curl.exe` 传 JSON** —— 引号会被吃掉，服务端收到非法 JSON 回 400（单引号、`\"` 两种写法都实测失败）。用 `Invoke-WebRequest`：
+
+```powershell
+$u = 'https://yishou-d9gyoykka49fb0634-1501173044.ap-shanghai.app.tcloudbase.com/api/favorites?user_id=11111111-1111-4111-8111-111111111111'
+function Post($body) {
+  try { $r = Invoke-WebRequest -Uri $u -Method Post -ContentType 'application/json' -Body $body -UseBasicParsing; "HTTP " + $r.StatusCode; $r.Content }
+  catch { "HTTP " + $_.Exception.Response.StatusCode.value__; (New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd() }
+}
+Post '{"entry_id":"shenxian-003"}'   # 201
+Post '{"entry_id":"shenxian-003"}'   # 409
+Post '{}'                            # 400
+```
+
+（`catch` 是必须的：PowerShell 遇到 4xx 会抛异常，不接就看不到响应体。）
+
 ## 备选部署路径（控制台 · Web 函数）
 
 控制台路径同样可行，代码一字不用改：**创建云函数 → 模板 HTTP 云函数 → Node.js Hello World** →
@@ -140,15 +175,31 @@ CLI 的 `fn deploy` 不带 `--env` 参数，环境变量走**管理接口**下�
 "C:\Users\lxb07\.workbuddy\binaries\node\versions\22.22.2-6\node.exe" cloudbase/tests/api-local-test.js
 ```
 
-期望最后一行 `==== 44 / 44 通过 ====`。它验三层：
+期望最后一行 `==== 93 / 93 通过 ====`。它验四层：
 1. **纯逻辑**：路由、参数校验、排序、分页、错误码、JSON 形状（假查询者复刻 `db/seed.sql` 的 5 个用户 + 9 条收藏）
-2. **聚合**：`hot` 的 `算榜单()` —— 票多在前、同票按 id 升序、limit 夹取
-3. **网关通路**：用**假的 `fetch`** 捕获真实请求 URL —— 基址、`Prefer: count=exact` 解析、`order=created_at.asc,id.asc`、`user_id` URL 编码、`+08:00 → UTC Z` 时间归一化、401 错误码映射
+2. **写入逻辑**（Day 18）：POST 分支的校验（缺字段 / 非字符串 / 空白 / 超 64 字）、201 形状、带约束的内存表（外键 + 唯一）复刻出 23503 / 23505
+3. **聚合**：`hot` 的 `算榜单()` —— 票多在前、同票按 id 升序、limit 夹取
+4. **网关通路**：用**假的 `fetch`** 捕获真实请求 URL —— 基址、`Prefer: count=exact` / `Prefer: return=representation`、`order=created_at.asc,id.asc`、`user_id` URL 编码、`+08:00 → UTC Z` 时间归一化、401 错误码映射、**SQLSTATE 归一化与响应头兜底**
+
+⚠️ **本机自测的固有盲区（2026-10-08 栽过一次）**：假接口只会回**你想到的形状**。
+当天「重复提交」用例用的假响应体是 `{code:'23505'}`，而真网关回的是 `{code:'DATABASE_23505'}`（带前缀）——
+本机 88/88 全绿，一上线重复提交就回了 500。
+**规矩**：凡是「对面系统给什么形状」的假设，**都要拿直连抓回来的原样文本回填断言**，别手写。
 
 **它不验「真连库通不通」** —— 那个只有部署后打公网地址才知道。
 
 ## 已知坑
 
+- 🔴 **第 1 坑（2026-10-08 实测，排查烧掉一整轮）：`scf_bootstrap` 的换行符必须是 LF。**
+  它一旦被转成 **CRLF**（Windows 编辑器 / Git 极易自动转），容器里 bash 执行的是 `exec node index.web.js\r` —— **`\r` 被当成文件名的一部分**，node 找不到 `index.web.js\r` → **容器根本没起来** → 网关恒回 **443 + 空响应体**（`x-cloudbase-upstream-status-code: 443`）。
+  **它骗人的地方**：函数状态 `Active`、配置逐字段正常、代码包下载回来看三个文件齐全且与本地逐字节一致、容器日志一行都没有（启动失败发生在 node 之前，连 `console.log` 都没机会打）。
+  | 判据 | |
+  |---|---|
+  | 线上 **443 且响应体空** | 容器**没起来**（不是代码逻辑错 —— 逻辑错会回 **500**） |
+  | 先查什么 | `grep -qU $'\r' scf_bootstrap`，别先读代码 |
+  | 一行修 | `python -c "p='scf_bootstrap';open(p,'wb').write(open(p,'rb').read().replace(b'\r\n',b'\n'))"`（改完重新部署） |
+  **为什么当时只有 `favorites` 中招**：`hot` 最后一次部署在 10-07 16:52（那时还是 LF），之后文件被改坏但**没再部署过**，线上跑的还是旧包 —— 也就是说 **`hot` 是一颗没引爆的地雷**，谁下次部署它谁中招（2026-10-08 已把本地文件一并修回 LF）。
+  💡 **同类排障思路**（拿不到容器日志时）：造一个**极简探针函数**做**正交对照** —— 一次只变一个量（代码内容 / 体积 / 环境变量 / 换行符），挂临时路由去探，谁 200 谁 443 一目了然，比猜快得多。用完记得把探针函数和路由删净。
 - 默认域名 `*.app.tcloudbase.com` **浏览器直开会先弹「页面访问提示」中间页**（按钮带 1 秒倒计时、`disabled`），点「确定访问」才见内容 —— 正常现象，不是部署失败。
   ⚠️ **要交的截图必须点掉它**，否则图里是提示页而不是接口返回。无头 Edge 可以用 CDP 点 `#submitBtn` 绕过（`tail` 见 `tmp/` 里的截图脚本）。
 - ⚠️ **`tcb fn deploy` 必须 `cd` 进函数目录执行**：CLI 找 `scf_bootstrap` 看的是**当前目录**，`--dir` 只决定打包什么。在仓库根跑会报「Web function requires scf_bootstrap startup file, not found in current directory」并转成交互提问。
@@ -158,5 +209,14 @@ CLI 的 `fn deploy` 不带 `--env` 参数，环境变量走**管理接口**下�
 - ⚠️ 首次请求有**冷启动**（可能几秒），别当挂死；接口已回 `cache-control: no-store`，刷新拿到的一定是新数据。
 - ⚠️ 网关是 **PostgREST 形态，不支持 `GROUP BY` / `count()`**。`total` 靠 `Prefer: count=exact` 回的头 `content-range: 0-0/5` 取尾段；`hot` 的聚合拉回 `entry_id` 列表（上限 5000 行）在函数里算 —— 收藏量上万后要改 PG 视图或 RPC（契约 §3.11 已记账）。
 - ⚠️ 网关回的时间是 `"2026-10-01T17:12:00+08:00"`（带时区偏移），契约要的是 `"2026-10-01T09:12:00Z"` → 函数里统一 `new Date(x).toISOString()` 后**去掉毫秒**。
+- ⚠️ **网关的错误码不是裸 SQLSTATE，而是带前缀的**（Day 18 实测）。唯一冲突时网关回：
+  ```json
+  HTTP 409
+  proxy-status: PostgREST; error=23505
+  {"code":"DATABASE_23505","message":"duplicate key value violates unique constraint \"favorites_user_entry_key\"","requestId":"…"}
+  ```
+  拿着 `"DATABASE_23505"` 去比 `=== '23505'` 会认不出 → 「重复收藏」被当成「服务器坏了」回 **500**（契约要 409）。
+  函数里用 `规范码()` 的 `/(\d{5})/` 只留 5 位 SQLSTATE，**并把响应头 `proxy-status` 作为兜底来源**（防将来网关连 `code` 字段都不给）。
+  排查提示：「明明数据库约束拦住了，接口却回 500」= 十有八九是这层前缀没剥。
 - ⚠️ 两个函数都做「前缀是否被剥掉」的兜底，所以各自只会处理自己的路径；`favorites` 收到 `/api/hot` 会回 404（本机自测里有这条）。
 - ⚠️ `updateFunctionConfig` 下发环境变量后**不需要重新部署代码**，配置变更即时生效；但**改了 `index.web.js` 就必须重新 deploy**。
