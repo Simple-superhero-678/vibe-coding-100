@@ -26,6 +26,68 @@
 > **关于 `hot` 的名字**：清单里的「热搜」是打卡课程模板（打卡 App 示例）的说法。本项目（异兽志）没有外部热搜需求，
 > Day 17 拍板把 `hot` 改口径为「**对现有 `favorites` 按 `entry_id` 聚合出的收藏榜**」——零建表、零外部数据源，读真库真行。
 
+## 目录结构（Day 19 分层重构后）
+
+```
+cloudbase/
+├── README.md                      ← 本文件
+├── functions/                     ← 一个子目录 = 一个云函数（各自独立打包部署）
+│   ├── health/
+│   │   ├── index.js               （Event 函数版，早期留档）
+│   │   ├── index.web.js           ← Web 函数版：GET /api/health，不连库
+│   │   └── （无 repository —— 它压根不碰数据库）
+│   ├── favorites/
+│   │   ├── index.web.js           ← 【接口层】575 行 → 326 行
+│   │   │                            只做：路由 / 方法分流 / 参数校验 / 读体 / 身份
+│   │   │                                  → 调仓库 → 组装 {ok,data} / {ok:false,error}
+│   │   ├── repositories/
+│   │   │   └── favoritesRepository.js  ← 【数据访问层】★ Day 19 拆出来的新文件
+│   │   │                                  所有「查数据库」的代码都在这里
+│   │   ├── scf_bootstrap          （启动脚本，必须 LF）
+│   │   └── package.json           （零依赖；⚠️ 不写 main）
+│   └── hot/
+│       ├── index.web.js           ← 【接口层】210 行 → 175 行
+│       │                            聚合（算榜单）留在这层 —— 它是纯计算，不是取数
+│       ├── repositories/
+│       │   └── favoritesRepository.js  ← 【数据访问层】★ Day 19 拆出来的新文件
+│       ├── scf_bootstrap
+│       └── package.json
+└── tests/
+    ├── api-local-test.js          ← 本机断言（假查询者 + 假 fetch，不连库不联网）93 条
+    ├── refactor-fingerprint.js    ← 【Day 19 新增】重构前后逐字节行为比对，22 例
+    └── online-regress.js          ← 【Day 19 新增】线上九接口回归（真打公网地址）
+```
+
+### 「查数据库」这段代码，从哪移到了哪？
+
+| 原来在 `index.web.js` 里的东西 | 现在在哪 |
+|---|---|
+| 网关基址拼接 `https://<envId>.api.tcloudbasegateway.com/v1/rdb/rest` | `repositories/favoritesRepository.js` · `建网关仓库()` |
+| `Authorization: Bearer <TCB_API_KEY>` 鉴权头 | 同上 |
+| `content-range` 里抠 `total`、`/favorites?select=…&order=…&limit=…` | 同上 · `总数()` / `分页()` |
+| `Prefer: return=representation` 的 POST 写入 | 同上 · `新增()` |
+| SQLSTATE 挖掘（`DATABASE_23505` 归一化 + `proxy-status` 兜底） | 同上 · `规范码()` / `挖SQLSTATE()` / `挖头SQLSTATE()` |
+| `pg.Pool` 连接池、参数化 SQL、`to_char(... AT TIME ZONE 'UTC')` | 同上 · `建pg仓库()` |
+| `PG_URL` 有无 → 选哪条通路 | 同上 · `建默认仓库()` |
+| 数据库错误码 → 契约 `code` + 中文人话（读 / 写两套） | 同上 · `翻错误()` / `翻写入错误()` |
+| `+08:00` → `…Z` 的时间归一化 | 同上 · `收成UTC()` |
+
+**留在接口层的**：URL 解析、`limit`/`offset` 校验、`UUID` 身份校验、请求体读取与校验、
+JSON 响应拼装、HTTP 状态码（200/201/400/401/405/409）。
+
+> ⭐ **一句话回答今天的问题**：从 `favorites/index.web.js`（和 `hot/index.web.js`）里，
+> **移到了各自同目录下的 `repositories/favoritesRepository.js`**。
+> 接口层从此**不再出现任何 SQL、网关地址、连接池** —— 它只负责「接请求、调函数、返响应」。
+
+### ⚠️ 为什么 `repositories/` 在函数目录**内部**，而不是 `cloudbase/repositories/` 共享一份
+
+`tcb fn deploy` 只打包**当前函数目录**（这也是必须 `cd` 进去再执行的原因）。
+跨目录 `require('../repositories/…')` 在**本机跑得好好的**，一上线就 `MODULE_NOT_FOUND`。
+所以 `favorites` / `hot` **各持一份**同表的 repository —— 代码是重复的，但这是该部署模型下的正确取舍。
+
+> ✅ **已验证**：`tcb fn deploy` 会把 `repositories/` 子目录一起打进代码包（Day 19 部署后线上 200，`require('./repositories/favoritesRepository.js')` 解析成功）。
+> 📌 两份副本的**差异是刻意的**：`hot` 那份只读（只有 `聚合行()`），不需要 `总数`/`分页`/`新增`/SQLSTATE 挖掘 —— 别顺手「统一」成一个文件。
+
 ## 数据通路：为什么不是 `pg` 直连
 
 Day 17 实测后的定案 —— **首选 CloudBase PG HTTP 网关，`pg` TCP 直连只作备选**：
@@ -110,6 +172,50 @@ CLI 的 `fn deploy` 不带 `--env` 参数，环境变量走**管理接口**下�
 > ⚠️ HTTP 函数的类型是 **`WEB_SCF`**（不是 `SCF`）；控制台里对应的坑是「关联资源」默认选「云托管」，要手动切成「云函数」。
 > 路由传播通常数秒~30 秒，别盲等 3–5 分钟。
 
+## 分层示意图（Day 19 余力加练）
+
+```mermaid
+flowchart TB
+    subgraph 浏览器
+        B["前端 store.js<br/>（Day 20–21 才接入）"]
+    end
+
+    subgraph 网关["CloudBase HTTP 网关 · 路由"]
+        R["/api/health · /api/favorites · /api/hot"]
+    end
+
+    subgraph 接口层["接口层（index.web.js）· 接请求 → 调函数 → 返响应"]
+        I1["favorites/index.web.js<br/>路由 · 方法分流 · limit/offset 校验<br/>UUID 身份校验 · 读体校体 · 状态码"]
+        I2["hot/index.web.js<br/>路由 · limit 校验 · 算榜单（纯计算）"]
+    end
+
+    subgraph 数据层["数据访问层（repositories/）· 唯一碰数据库的地方"]
+        D1["favorites/repositories/<br/>favoritesRepository.js<br/>总数 / 分页 / 新增<br/>+ 时间归一化 + SQLSTATE 挖掘 + 错误翻译"]
+        D2["hot/repositories/<br/>favoritesRepository.js<br/>聚合行（只读）"]
+    end
+
+    subgraph 通路["两条数据通路（由 PG_URL 自动分流）"]
+        P1["① PG HTTP 网关<br/>PostgREST 形态 · 免 VPC · PostgREST 无 GROUP BY"]
+        P2["② pg 驱动 TCP 直连<br/>配了 PG_URL 才走 · 需 VPC/白名单"]
+    end
+
+    DB[("PostgreSQL<br/>public.favorites · public.users")]
+
+    B --> R --> I1 & I2
+    I1 --> D1
+    I2 --> D2
+    D1 --> P1 & P2
+    D2 --> P1 & P2
+    P1 & P2 --> DB
+
+    style 接口层 fill:#F4EFE4,stroke:#A3302A,color:#1F1B18
+    style 数据层 fill:#F4EFE4,stroke:#A3302A,color:#1F1B18
+    style 通路 fill:#F4EFE4,stroke:#6B6157,color:#1F1B18
+```
+
+> 图中红框（朱砂）是 Day 19 划出的两层边界：**接口层不碰数据库，数据层不管 HTTP**。
+> `favorites` 与 `hot` 各持一份 `repositories/`，因为云函数按目录独立打包（见上节）。
+
 ## 验证记录（Day 17 实测，2026-10-07）
 
 ```bash
@@ -159,6 +265,40 @@ Post '{}'                            # 400
 
 （`catch` 是必须的：PowerShell 遇到 4xx 会抛异常，不接就看不到响应体。）
 
+## 验证记录（Day 19 分层重构 · 2026-10-08）
+
+重构**只动结构、不动行为**。三道闸门逐级验证：
+
+| # | 验什么 | 命令 | 结果 |
+|---|---|---|---|
+| 1 | 本机断言（假查询者 + 假 fetch） | `node cloudbase/tests/api-local-test.js` | **93 / 93 通过** |
+| 2 | 重构前后**逐字节**行为比对 | `node cloudbase/tests/refactor-fingerprint.js` | **22 / 22 一致** |
+| 3 | 重新部署后**线上真打** | `node cloudbase/tests/online-regress.js` | **9 / 9 符合预期** |
+
+**第 2 道闸门（Day 19 新增）怎么做的**：把 Day 18 提交（`020df09`）里的两个 `index.web.js`
+用 `git show` 取出来放进 `tmp/day19-基线/`，与当前重构版**各起一个本地 http 服务**，
+用同一份 22 例请求清单（GET 读 / POST 写 / 参数校验 / 身份校验 / 方法分流 / 404/405/OPTIONS）
+打两边，比对**状态码 + `content-type` + `cache-control` + 响应体原文**。
+它比断言更贴「线上行为不变」这句话 —— 覆盖 JSON 字段顺序、错误文案、路由兜底。
+
+**第 3 道闸门实测明细**（`tmp/day19-截图/线上返回.json` 是原始记录）：
+
+| 接口 | HTTP | 响应 |
+|---|---|---|
+| `GET /api/health` | **200** | `{"ok":true,"service":"yishou"}` |
+| `GET /api/favorites`（无身份） | **401** | `UNAUTHORIZED` |
+| `GET /api/favorites?limit=abc` | **400** | `limit 必须是整数` |
+| `GET /api/favorites?user_id=1111…` | **200** | `{"ok":true,"data":{"total":9,"items":[…]}}` |
+| `GET /api/hot` | **200** | `{"ok":true,"data":{"total":13,"items":[{"entry_id":"shenxian-003","fav_count":2},…]}}` |
+| `GET /api/hot?limit=2` | **200** | 同上，只 2 条 |
+| `POST /api/favorites`（新条目） | **201** | `{"ok":true,"data":{"entry_id":"yishou-day19-check","created_at":"2026-10-08T12:20:47Z"}}` |
+| `POST /api/favorites`（**再来一次**） | **409** | `FAV_DUPLICATE` ← 证明 SQLSTATE 挖掘链路在拆分后**完好** |
+| `PUT /api/favorites` | **405** | `METHOD_NOT_ALLOWED` |
+
+> ⚠️ 回归用例里的 `user_id` **必须是 `users` 表里真实存在的 uuid**（用 `11111111-1111-4111-8111-111111111111`）。
+> 随手编一个 uuid 会被 `favorites.user_id` 的外键拦住 → 23503 → **400 `BAD_REQUEST`**。
+> 这是**正确行为**（接口在告诉你「收藏要挂在真实用户上」），但会让人误以为写入坏了。
+
 ## 备选部署路径（控制台 · Web 函数）
 
 控制台路径同样可行，代码一字不用改：**创建云函数 → 模板 HTTP 云函数 → Node.js Hello World** →
@@ -176,7 +316,6 @@ Post '{}'                            # 400
 ```
 
 期望最后一行 `==== 93 / 93 通过 ====`。它验四层：
-1. **纯逻辑**：路由、参数校验、排序、分页、错误码、JSON 形状（假查询者复刻 `db/seed.sql` 的 5 个用户 + 9 条收藏）
 2. **写入逻辑**（Day 18）：POST 分支的校验（缺字段 / 非字符串 / 空白 / 超 64 字）、201 形状、带约束的内存表（外键 + 唯一）复刻出 23503 / 23505
 3. **聚合**：`hot` 的 `算榜单()` —— 票多在前、同票按 id 升序、limit 夹取
 4. **网关通路**：用**假的 `fetch`** 捕获真实请求 URL —— 基址、`Prefer: count=exact` / `Prefer: return=representation`、`order=created_at.asc,id.asc`、`user_id` URL 编码、`+08:00 → UTC Z` 时间归一化、401 错误码映射、**SQLSTATE 归一化与响应头兜底**

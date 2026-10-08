@@ -12,119 +12,54 @@
  * 对现有 public.favorites 按 entry_id 聚合出的「被收藏最多」的条目榜：
  * 零建表、零外部数据源、读的是真库真行。
  *
+ * ⭐ Day 19 分层重构：本文件**只保留接口层** —— 路由 / 参数校验 / JSON 组装 / 错误码。
+ *   「查数据库」那段代码**全部移到了同目录的** `./repositories/favoritesRepository.js`：
+ *     · 网关 URL 拼接、Bearer 鉴权、limit 拼接   → 建网关仓库()
+ *     · pg 连接池、参数化 SQL                    → 建pg仓库()
+ *     · PG_URL 分流                              → 建默认仓库()
+ *     · 数据库错误码 → 契约 code + 人话            → 翻错误
+ *   ⚠️ 聚合（算榜单）**留在本层**：它不是「取数」，是纯业务计算（可单测、不碰 IO），
+ *   放接口层才符合「仓库只管取数、逻辑在接口层」的分层口径。
+ *
+ * ⚠️ 聚合为什么在 JS 里做：CloudBase 网关是 PostgREST 形态，**不支持 GROUP BY**，
+ *   所以取回 entry_id 列表（上限 5000 行）后在 JS 里计数排序 —— 当前量级
+ *   （个位数~千级）完全够用；将来若收藏量上万，再改成 PG 视图或 RPC（契约 §3.11 记账）。
+ *
+ * 为什么 repository 放在函数目录内部（不放 cloudbase/repositories/ 共享）：
+ *   `tcb fn deploy` 只打包**当前函数目录**，跨目录 require 在线上会找不到文件。
+ *   所以 favorites / hot 各持一份 —— 见 README「目录结构」。
+ *
  * 认证：否（榜单是聚合结果，不含任何个人信息）
  * 参数：limit（默认 10、最大 50）
  *
- * 数据通路：与 favorites 相同（PG_URL 有值走 pg 直连；否则走 CloudBase PG HTTP 网关）。
- * ⚠️ 网关是 PostgREST 形态，**不支持 GROUP BY**，所以聚合在函数里做：
- *    取回 entry_id 列表（上限 5000 行）后在 JS 里计数排序 —— 当前量级（个位数~千级）
- *    完全够用；将来若收藏量上万，再改成 PG 视图或 RPC（契约 §3.11 记账）。
- *
- * 说明：这里刻意把 favorites 里的几个小工具重写了一遍，不做跨目录 require ——
- * 每个函数目录独立部署，跨目录引用在线上会找不到文件。
+ * 结构上分两层，为了「能在本机自动验」：
+ *   造处理({ 查询者 }) —— 纯逻辑：路由、参数校验、组装 JSON、错误码。查询者是注入的，可换假的
+ *   建默认查询者()     —— 真取数（来自 ./repositories/favoritesRepository.js）
  */
 
 const http = require('http');
+const 仓库 = require('./repositories/favoritesRepository.js');
 
 const SERVICE = 'yishou';
 const PORT = process.env.PORT || 9000;
 
 const 默认条数 = 10;
 const 最大条数 = 50;
-const 取回上限 = 5000; // 一次最多拉这么多行来聚合
 
-/* —— 通路①：CloudBase PG HTTP 网关（PostgREST 形态） —— */
-function 建网关查询者() {
-  const 环境ID = (process.env.TCB_ENV_ID || 'yishou-d9gyoykka49fb0634').trim();
-  const 密钥 = (process.env.TCB_API_KEY || '').trim();
-  if (!密钥) {
-    throw new Error(
-      '缺少环境变量 TCB_API_KEY（CloudBase 环境 API Key）。到函数配置 → 环境变量里加一条，' +
-        '或改用 PG_URL 走 TCP 直连'
-    );
-  }
-  const 基址 = `https://${环境ID}.api.tcloudbasegateway.com/v1/rdb/rest`;
+/* ==========================================================================
+ * 一、真取数（= 仓库；本文件只转发，不自己连库）
+ * ========================================================================== */
 
-  async function 取(路径, 额外头) {
-    const 头 = Object.assign({ authorization: 'Bearer ' + 密钥, accept: 'application/json' }, 额外头 || {});
-    const 响应 = await fetch(基址 + 路径, { headers: 头 });
-    const 文本 = await 响应.text();
-    if (!响应.ok) {
-      let 说明 = 文本.slice(0, 300);
-      try {
-        const j = JSON.parse(文本);
-        说明 = j.message || j.error || 说明;
-      } catch (e) {
-        /* 非 JSON 就直接用原文 */
-      }
-      const e = new Error(`网关 ${响应.status}：${说明}`);
-      e.code = '网关' + 响应.status;
-      throw e;
-    }
-    return { 文本, 响应头: 响应.headers };
-  }
-
-  return {
-    async 聚合行() {
-      const { 文本 } = await 取(`/favorites?select=entry_id&limit=${取回上限}`);
-      return JSON.parse(文本).map((r) => ({ entry_id: r.entry_id }));
-    },
-  };
+// 保留这个名字，接口层与线上入口都用它；实现已搬到 repositories/
+function 建默认查询者(选项) {
+  return 仓库.建默认仓库(选项);
 }
 
-/* —— 通路②：直连 TCP（pg 驱动） —— */
-function 要SSL(连接串) {
-  return /sslmode=require/i.test(连接串) || process.env.PG_SSL === '1';
-}
+const 翻错误 = 仓库.翻错误;
 
-function 建pg查询者(连接串) {
-  const { Pool } = require('pg');
-  const 池 = new Pool({
-    connectionString: 连接串,
-    max: 2,
-    idleTimeoutMillis: 10000,
-    connectionTimeoutMillis: 8000,
-    ...(要SSL(连接串) ? { ssl: { rejectUnauthorized: false } } : {}),
-  });
-  池.on('error', (e) => console.error('[pg] 空闲连接出错：', e.message));
-
-  return {
-    async 聚合行() {
-      return (await 池.query('SELECT entry_id FROM public.favorites LIMIT $1', [取回上限])).rows;
-    },
-  };
-}
-
-function 建默认查询者() {
-  const 连接串 = (process.env.PG_URL || '').trim();
-  if (连接串) {
-    console.log('[hot] 数据通路：pg 直连 (PG_URL)');
-    return 建pg查询者(连接串);
-  }
-  console.log('[hot] 数据通路：CloudBase PG HTTP 网关 (TCB_API_KEY)');
-  return 建网关查询者();
-}
-
-function 翻错误(err) {
-  const 码 = err && err.code;
-  const 附注 = {
-    网关401: 'API Key 无效或已失效（TCB_API_KEY）',
-    网关403: 'API Key 权限不足或环境不对',
-    网关404: '网关路径不对——检查 TCB_ENV_ID 与是否已开通 PG',
-    '28P01': '账号或密码不对（连接串里的用户名/密码）',
-    '3D000': '连接串里的数据库名不存在',
-    '42P01': '表不存在 —— 建表脚本（db/schema.sql）是不是没在这个库跑过？',
-    '42501': '权限不足 —— 该角色读不了 public.favorites',
-    ENOTFOUND: '数据库主机名解析不了（PG_URL 里的 host 写错了）',
-    ECONNREFUSED: '数据库拒绝连接（端口不对，或云函数不在可访问的白名单/VPC 里）',
-    ETIMEDOUT: '连接数据库超时（网络不通，优先查白名单/VPC）',
-  }[码];
-
-  return {
-    code: 'INTERNAL',
-    message: 附注 ? `读取失败：${附注}` : `读取失败：${(err && err.message) || err}`,
-  };
-}
+/* ==========================================================================
+ * 二、纯逻辑：路由 + 参数 + 组装响应（查询者注入）
+ * ========================================================================== */
 
 function 回(res, 状态码, 体) {
   res.writeHead(状态码, {
@@ -183,13 +118,13 @@ function 造处理({ 查询者 }) {
       return 成功(res, 算榜单(行, limit));
     } catch (err) {
       console.error('[hot] 查询失败：', err && err.message);
-      const 错 = 翻错误(err);
+      const 错 = 仓库.翻错误(err);
       return 失败(res, 500, 错.code, 错.message);
     }
   };
 }
 
-module.exports = { 造处理, 建默认查询者, 算榜单, 默认条数, 最大条数, SERVICE };
+module.exports = { 造处理, 建默认查询者, 算榜单, 默认条数, 最大条数, SERVICE, 仓库 };
 
 if (require.main === module) {
   let 查询者;
