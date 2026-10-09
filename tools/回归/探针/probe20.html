@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- Day 20 板块②探针：只「等和抄」，判定写在外面（day20-verify-local.py）。
+     iframe 锁 1180 宽加载首页；页尾 /__never 卡 load，让 Edge --timeout 到点后 dump 的 DOM
+     是异步数据回来之后的。结果写进 <pre id="probe-out">（textContent，引号不转义）。 -->
+<iframe id="f" src="/index.html" width="1180" height="900"></iframe>
+<img src="/__never" style="display:none">
+<pre id="probe-out" hidden></pre>
+<script>
+(async () => {
+  const 出 = {};
+  const 等 = (ms) => new Promise((r) => setTimeout(r, ms));
+  const 文档 = () => document.getElementById('f').contentDocument;
+
+  // 一、轮询真条件：检查台**全部格子落定**（不再有「读取中」——health 800ms 就回，
+  //     favorites 冷启动 3 秒+，抄早了会把「读取中」当终态）
+  let 台文 = '';
+  for (let i = 0; i < 36; i++) {
+    await 等(400);
+    const d = 文档();
+    if (!d) continue;
+    const 台 = d.getElementById('检查台');
+    if (台 && 台.textContent && !/读取中/.test(台.textContent) && /服务正常|读不到/.test(台.textContent)) {
+      台文 = 台.textContent;
+      break;
+    }
+  }
+  出.检查台文本 = 台文;
+
+  // 二、公网请求证据：performance 资源清单里 tcloudbase 域名的条目（只存 host，防 & 转义）
+  try {
+    const 资 = document.getElementById('f').contentWindow.performance.getEntriesByType('resource');
+    出.公网请求 = [...new Set(资.filter((e) => /tcloudbase/.test(e.name)).map((e) => new URL(e.name).host))];
+  } catch (e) { 出.公网请求 = '取不到: ' + e.message; }
+
+  // 三、写入测试：点按钮，等 .station-log 落出 201 / 409 / 失败
+  try {
+    const d = 文档();
+    const 钮 = d.querySelector('.station-act');
+    if (!钮) { 出.写入 = '没有写入按钮'; }
+    else {
+      钮.click();
+      出.写入 = '';
+      for (let i = 0; i < 30; i++) {   // POST 冷启动 3 秒+，等够 12 秒
+        await 等(400);
+        const 记 = 文档() && 文档().querySelector('.station-log');
+        if (记 && /201|409|失败/.test(记.textContent)) { 出.写入 = 记.textContent; break; }
+      }
+      if (!出.写入) 出.写入 = '写入结果 12 秒内未落出';
+    }
+  } catch (e) { 出.写入 = '点失败: ' + e.message; }
+
+  document.getElementById('probe-out').textContent = 'PROBE_JSON:' + JSON.stringify(出);
+})();
+</script>

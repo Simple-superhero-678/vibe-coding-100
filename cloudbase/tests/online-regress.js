@@ -26,6 +26,8 @@ const 基址 = (process.env.API_BASE || 'https://yishou-d9gyoykka49fb0634-150117
 const UUID = '11111111-1111-4111-8111-111111111111';
 const 输出 = path.resolve(__dirname, '..', '..', 'tmp', 'day19-截图', '线上返回.json');
 
+// Day 20：写入用例改用带时间戳的唯一 id —— 固定 id 会在第二次跑回归时撞 409（Day 19 的残留已实证）
+const 写入ID = 'yishou-regress-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
 const 清单 = [
   { 名: 'GET /api/health', method: 'GET', 路径: '/api/health' },
   { 名: 'GET /api/favorites（无身份）', method: 'GET', 路径: '/api/favorites' },
@@ -33,8 +35,8 @@ const 清单 = [
   { 名: 'GET /api/favorites（正常）', method: 'GET', 路径: `/api/favorites?user_id=${UUID}` },
   { 名: 'GET /api/hot', method: 'GET', 路径: '/api/hot' },
   { 名: 'GET /api/hot?limit=2', method: 'GET', 路径: '/api/hot?limit=2' },
-  { 名: 'POST /api/favorites（新增）', method: 'POST', 路径: `/api/favorites?user_id=${UUID}`, 体: { entry_id: 'yishou-day19-check' } },
-  { 名: 'POST /api/favorites（重复 → 409）', method: 'POST', 路径: `/api/favorites?user_id=${UUID}`, 体: { entry_id: 'yishou-day19-check' } },
+  { 名: 'POST /api/favorites（新增）', method: 'POST', 路径: `/api/favorites?user_id=${UUID}`, 体: { entry_id: 写入ID } },
+  { 名: 'POST /api/favorites（重复 → 409）', method: 'POST', 路径: `/api/favorites?user_id=${UUID}`, 体: { entry_id: 写入ID } },
   { 名: 'PUT /api/favorites（405）', method: 'PUT', 路径: `/api/favorites?user_id=${UUID}` },
 ];
 

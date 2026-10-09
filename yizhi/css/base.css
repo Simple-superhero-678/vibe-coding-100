@@ -396,3 +396,92 @@ body{
   .tail{margin-top:18px}
   .colophon{margin-top:30px}
 }
+
+/* ══ 后端检查台（Day 20 追加）══════════════════════════════════════════
+   [是什么] 首页的一条窄「牌记」：现场向公网接口拉真实数据（健康 / favorites 表 / 写入测试）。
+   [画风] 版心内横栏，宣纸暗部平涂 + 单侧朱砂界线；竖排小题签仿古籍牌记；
+          无圆角无阴影，朱砂只出现在「状态点」与按钮描边 —— 强调色不超编。
+   [为什么放卷轴前面] 它是「这个站背后有个真库」的一句话声明，属于卷首信息，
+          不是内容区的一员；窄到不把「搜索 → 筛选 → 卡片」挤下首屏。 */
+.station{
+  display:flex;
+  align-items:stretch;
+  gap:0;
+  max-width:var(--measure);
+  margin:14px auto 0;
+  border:1px solid var(--hairline);
+  border-left:2px solid var(--cinnabar);
+  background:var(--paper-deep);
+  font-family:var(--sans);
+  font-size:12px;
+  line-height:1.7;
+  color:var(--ink-2);
+}
+.station-mark{
+  writing-mode:vertical-rl;      /* 竖排题签：古籍牌记的形 */
+  letter-spacing:.32em;
+  padding:8px 7px;
+  border-right:1px solid var(--hairline);
+  color:var(--cinnabar);
+  font-family:var(--serif);
+  font-size:12px;
+  user-select:none;
+}
+.station-grid{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:2px 0;
+  padding:7px 14px;
+  min-width:0;
+}
+.station-cell{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:0 14px 0 0;
+  margin-right:14px;
+  border-right:1px solid var(--hairline);
+  min-width:0;
+}
+.station-cell:last-child{border-right:0;margin-right:0;padding-right:0}
+.station-cell-t{
+  font-family:var(--serif);
+  color:var(--ink);
+  letter-spacing:.14em;
+  white-space:nowrap;
+}
+/* 状态点：好 = 朱砂实心（全站唯一强调色）；坏 = 淡墨空心 */
+.station-dot{
+  width:7px;height:7px;flex:none;
+  border-radius:0;                /* 红线：无圆角 —— 方点 */
+  background:var(--cinnabar);
+}
+.station-dot.点-坏{
+  background:none;
+  border:1px solid var(--ink-2);
+}
+.station-cell span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.station-wait{font-style:italic}
+.station-retry,.station-act{
+  appearance:none;
+  background:none;
+  border:1px solid var(--cinnabar);
+  color:var(--cinnabar);
+  font:inherit;
+  font-size:11px;
+  letter-spacing:.1em;
+  padding:1px 9px;
+  cursor:pointer;
+}
+.station-retry:hover,.station-act:not([aria-disabled="true"]):hover{
+  background:var(--cinnabar);
+  color:var(--paper);
+}
+.station-log{font-size:11px;white-space:normal}
+@media(max-width:720px){
+  .station{flex-direction:row}
+  .station-mark{writing-mode:horizontal-tb;padding:5px 9px;border-right:1px solid var(--hairline)}
+  .station-cell{border-right:0;padding-right:0;margin-right:0;width:100%}
+  .station-cell span:last-child{white-space:normal}
+}

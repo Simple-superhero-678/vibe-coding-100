@@ -46,6 +46,13 @@ const PORT = process.env.PORT || 9000;
 const 默认条数 = 10;
 const 最大条数 = 50;
 
+// 可信来源（Day 20）：线上 CORS 由网关反射承担；这份白名单只用于 OPTIONS 分支的本机直连自测。
+const 可信来源 = new Set([
+  'https://yishou-d9gyoykka49fb0634-1501173044.tcloudbaseapp.com',
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
+]);
+
 /* ==========================================================================
  * 一、真取数（= 仓库；本文件只转发，不自己连库）
  * ========================================================================== */
@@ -62,11 +69,12 @@ const 翻错误 = 仓库.翻错误;
  * ========================================================================== */
 
 function 回(res, 状态码, 体) {
+  // CORS（Day 20 收紧）：函数侧不再写 access-control-allow-origin ——
+  // 网关会对可信来源（本环境静态托管域名 / localhost / 127.0.0.1）反射 Origin，
+  // 函数写的 '*' 会与反射值拼成 "值,*" 双值非法头（Day 20 实测），浏览器直接拒收。
   res.writeHead(状态码, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
-    'access-control-allow-origin': '*',
-    'access-control-allow-headers': 'authorization,content-type',
   });
   res.end(JSON.stringify(体));
 }
@@ -93,11 +101,14 @@ function 造处理({ 查询者 }) {
       return 失败(res, 404, 'NOT_FOUND', `没有这个接口：${路径}`);
     }
     if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'access-control-allow-origin': '*',
-        'access-control-allow-headers': 'authorization,content-type',
-        'access-control-allow-methods': 'GET,OPTIONS',
-      });
+      // 预检（Day 20 收紧）：线上由网关整体接管；这里的白名单回显只服务本机直连自测。
+      const origin = req.headers.origin || '';
+      const 头 = { 'access-control-allow-methods': 'GET,OPTIONS' };
+      if (可信来源.has(origin)) {
+        头['access-control-allow-origin'] = origin;
+        头['access-control-allow-headers'] = 'authorization,content-type';
+      }
+      res.writeHead(204, 头);
       return res.end();
     }
     if (req.method !== 'GET') {

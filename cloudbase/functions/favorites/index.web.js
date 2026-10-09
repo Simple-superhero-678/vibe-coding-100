@@ -56,6 +56,14 @@ const 最大条数 = 500;
 // 只认 uuid 形态的 user_id（表里 user_id 是 uuid 列，格式不对不用去问数据库）
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// 可信来源（Day 20）：线上 CORS 由网关反射承担；这份白名单只用于 OPTIONS 分支的本机直连自测。
+// 与网关实测口径对齐：自己的静态托管域名 + 本机调试地址；不用 * 通配符。
+const 可信来源 = new Set([
+  'https://yishou-d9gyoykka49fb0634-1501173044.tcloudbaseapp.com',
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
+]);
+
 /* ==========================================================================
  * 一、真取数（= 仓库；本文件只转发，不自己连库）
  * ========================================================================== */
@@ -165,11 +173,13 @@ function 失败(res, 状态码, code, message) {
 }
 
 function 回(res, 状态码, 体) {
+  // CORS（Day 20 收紧）：函数侧**不再写** access-control-allow-origin ——
+  // 实测 CloudBase 网关会对可信来源（本环境静态托管域名 / localhost / 127.0.0.1）反射 Origin，
+  // 陌生来源（如 evil.com）不反射；函数再写一个 '*' 会被拼成 "反射值,*" 双值非法头，浏览器直接拒收。
+  // 白名单语义由网关承担：只放行自己的域名 + 本机调试地址，正好满足「禁通配符」的要求。
   res.writeHead(状态码, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store', // 验收要「刷新后跟着变」，绝不能缓存
-    'access-control-allow-origin': '*', // Day 17 先在函数侧放行，Day 18 前端接入时够用
-    'access-control-allow-headers': 'authorization,content-type',
   });
   res.end(JSON.stringify(体));
 }
@@ -262,11 +272,15 @@ function 造处理({ 查询者 }) {
       return 失败(res, 404, 'NOT_FOUND', `没有这个接口：${路径}`);
     }
     if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'access-control-allow-origin': '*',
-        'access-control-allow-headers': 'authorization,content-type',
-        'access-control-allow-methods': 'GET,POST,OPTIONS',
-      });
+      // 预检（Day 20 收紧）：线上由网关整体接管（实测函数写的头会被替换成按请求反射的值）。
+      // 这里的白名单回显只服务本机直连自测 —— 可信来源才回 CORS 头，不给通配符。
+      const origin = req.headers.origin || '';
+      const 头 = { 'access-control-allow-methods': 'GET,POST,OPTIONS' };
+      if (可信来源.has(origin)) {
+        头['access-control-allow-origin'] = origin;
+        头['access-control-allow-headers'] = 'authorization,content-type';
+      }
+      res.writeHead(204, 头);
       return res.end();
     }
     if (req.method === 'GET') return 处理读取(req, res);

@@ -36,6 +36,11 @@
   <!-- 版心鱼尾：古籍版心的标记，纯装饰 -->
   <div class="tail" aria-hidden="true"></div>
 
+  <!-- 后端检查台（Day 20）：一条窄牌记，现场从公网接口拉真实数据 ——
+       健康状态 · favorites 表真实行 · 一次写入测试。
+       内容由 js/station.js 自治渲染（不进 main.js 的部形态主链路），数据只经 js/api.js。 -->
+  <section class="station" id="检查台" aria-label="后端检查台"></section>
+
   <!-- 卷轴（09-22 追加）：把「搜索 → 筛选 → 卡片」整段卷起来。
        上下各一条轴 —— 轴面有迎光/背光两道，两端各一枚朱砂菱轴头，全用 CSS 画。
        轴比正文宽出 10px：卷面总比写在纸上的字阔一点，这是卷轴的常识，也是它跟
@@ -135,5 +140,6 @@
 </dialog>
 
 <script type="module" src="js/main.js"></script>
+<script type="module" src="js/station.js"></script>
 </body>
 </html>
