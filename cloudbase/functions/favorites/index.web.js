@@ -161,6 +161,20 @@ function 校验新收藏(体) {
   return { entry_id: 值 };
 }
 
+// 校验路径里的 entry_id 段（PATCH/DELETE 用）：与 POST 的 entry_id 同套规则
+function 校验路径条目(段) {
+  if (段 === undefined || 段 === null) {
+    return { 错: '缺少路径参数：entry_id（例如 /api/favorites/yishou-001）' };
+  }
+  if (String(段).includes('/')) {
+    return { 错: 'entry_id 不能包含斜杠（/）' };
+  }
+  const 值 = String(段).trim();
+  if (值 === '') return { 错: 'entry_id 不能为空' };
+  if (值.length > 64) return { 错: `entry_id 最长 64 个字符，收到 ${值.length} 个` };
+  return { entry_id: 值 };
+}
+
 // 契约 §1：成功 {ok,data}；失败 {ok:false,error:{code,message}}
 function 成功并(res, 状态码, data) {
   return 回(res, 状态码, { ok: true, data });
@@ -264,18 +278,127 @@ function 造处理({ 查询者 }) {
     }
   }
 
+  // —— PATCH：局部修改一条收藏的备注（Day 22） ——
+  async function 处理修改(req, res, entry_id) {
+    const user_id = 要身份(req, res);
+    if (!user_id) return;
+
+    const 校验 = 校验路径条目(entry_id);
+    if (校验.错) {
+      console.log(`[favorites] 修改被拒（路径不合规）user=${user_id} 原因=${校验.错}`);
+      return 失败(res, 400, 'BAD_REQUEST', 校验.错);
+    }
+
+    let 原文;
+    try {
+      原文 = await 读请求体(req);
+    } catch (e) {
+      return 失败(res, 400, 'BAD_REQUEST', `请求体读取失败：${e.message}`);
+    }
+
+    let 体;
+    try {
+      体 = JSON.parse(原文 || '{}');
+    } catch (e) {
+      return 失败(res, 400, 'BAD_REQUEST', '请求体不是合法 JSON，例如 {"remark":"这是我的备注"}');
+    }
+
+    if (体 === null || typeof 体 !== 'object' || Array.isArray(体)) {
+      return 失败(res, 400, 'BAD_REQUEST', '请求体必须是一个 JSON 对象，例如 {"remark":"这是我的备注"}');
+    }
+    if (!('remark' in 体)) {
+      return 失败(res, 400, 'BAD_REQUEST', 'PATCH 只能修改 remark（备注）字段，请求体里没带 remark');
+    }
+    const 备注 = 体.remark;
+    if (typeof 备注 !== 'string') {
+      return 失败(res, 400, 'BAD_REQUEST', 'remark 必须是字符串（最多 500 字，传空字符串可清空备注）');
+    }
+    const 去空 = 备注.trim();
+    if (去空.length > 500) {
+      return 失败(res, 400, 'BAD_REQUEST', `remark 最长 500 个字符，收到 ${去空.length} 个`);
+    }
+
+    try {
+      const 行 = await 查询者.改备注(user_id, 校验.entry_id, 去空);
+      console.log(
+        `[favorites] 备注已改 user=${user_id} entry=${行.entry_id} remark=${
+          行.remark === null || 行.remark === '' ? '（清空）' : '已写入'
+        }`
+      );
+      return 成功(res, { entry_id: 行.entry_id, remark: 行.remark, created_at: 行.created_at });
+    } catch (err) {
+      if (String((err && err.sqlstate) || '') === 'NOT_FOUND') {
+        console.log(`[favorites] 修改失败（找不到）user=${user_id} entry=${校验.entry_id}`);
+        return 失败(res, 404, 'FAV_NOT_FOUND', err.message);
+      }
+      const 错 = 仓库.翻写入错误(err);
+      console.error(`[favorites] 备注修改失败 user=${user_id} entry=${校验.entry_id} 原因=${err && err.message}`);
+      return 失败(res, 错.状态码, 错.code, 错.message);
+    }
+  }
+
+  // —— DELETE：取消一条收藏（Day 22，契约 §3.7） ——
+  async function 处理删除(req, res, entry_id) {
+    const user_id = 要身份(req, res);
+    if (!user_id) return;
+
+    const 校验 = 校验路径条目(entry_id);
+    if (校验.错) {
+      console.log(`[favorites] 删除被拒（路径不合规）user=${user_id} 原因=${校验.错}`);
+      return 失败(res, 400, 'BAD_REQUEST', 校验.错);
+    }
+
+    try {
+      const 行 = await 查询者.移除(user_id, 校验.entry_id);
+      console.log(`[favorites] 已取消收藏 user=${user_id} entry=${行.entry_id}`);
+      return 成功(res, { removed: true });
+    } catch (err) {
+      if (String((err && err.sqlstate) || '') === 'NOT_FOUND') {
+        console.log(`[favorites] 删除失败（找不到）user=${user_id} entry=${校验.entry_id}`);
+        // 契约 §3.7：删不存在的 = 404，前端静默当成功（幂等）
+        return 失败(res, 404, 'FAV_NOT_FOUND', err.message);
+      }
+      const 错 = 仓库.翻错误(err, '删除');
+      console.error(`[favorites] 取消收藏失败 user=${user_id} entry=${校验.entry_id} 原因=${err && err.message}`);
+      return 失败(res, 错.状态码, 错.code, 错.message);
+    }
+  }
+
   return async function 处理(req, res) {
     const 路径 = (req.url || '/').split('?')[0].replace(/\/+$/, '') || '/';
+    const 前缀 = '/api/favorites';
 
-    // 兜住「网关是否剥掉路径前缀」两种行为，与 health 一致
-    if (路径 !== '/' && !路径.endsWith('/api/favorites')) {
+    // 兼容网关两种转发（health 函数也是这套双兼容写法，见 cloudbase/functions/health/index.web.js）：
+    //   ① 完整透传  → /api/favorites（集合）/ /api/favorites/{id}（单项）
+    //   ② 剥掉路由前缀后只给相对部分 → /（集合）/ /{id}（单项）
+    // 归一化成「是否集合 + 子段（单项时是 entry_id）」，两种形态都走同一套后续逻辑。
+    let 是集合;
+    let 子段;
+    if (路径 === 前缀 || 路径.startsWith(前缀 + '/') || 路径.endsWith(前缀)) {
+      // 完整路径形态（含 /x/api/favorites 旧兼容路径，指纹回归依赖它返回 200）
+      是集合 = (路径 === 前缀 || 路径.endsWith(前缀));
+      子段 = 是集合 ? '' : 路径.slice(前缀.length).replace(/^\//, '');
+    } else if (路径 === '/' || 路径 === '') {
+      是集合 = true;
+      子段 = '';
+    } else if (路径.startsWith('/')) {
+      // 剥前缀形态：/x。但若以 /api/ 开头又不是本接口（如 /api/nope），按 404 拦下，
+      // 守住「未知接口」语义，也和指纹回归里 /api/nope → 404 一致。
+      if (路径.startsWith('/api/')) {
+        return 失败(res, 404, 'NOT_FOUND', `没有这个接口：${路径}`);
+      }
+      是集合 = false;
+      子段 = 路径.replace(/^\//, '');
+    } else {
       return 失败(res, 404, 'NOT_FOUND', `没有这个接口：${路径}`);
     }
+
     if (req.method === 'OPTIONS') {
       // 预检（Day 20 收紧）：线上由网关整体接管（实测函数写的头会被替换成按请求反射的值）。
       // 这里的白名单回显只服务本机直连自测 —— 可信来源才回 CORS 头，不给通配符。
       const origin = req.headers.origin || '';
-      const 头 = { 'access-control-allow-methods': 'GET,POST,OPTIONS' };
+      // 集合端点与单项端点都放行；PATCH/DELETE 是今天新上的方法
+      const 头 = { 'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS' };
       if (可信来源.has(origin)) {
         头['access-control-allow-origin'] = origin;
         头['access-control-allow-headers'] = 'authorization,content-type';
@@ -283,12 +406,19 @@ function 造处理({ 查询者 }) {
       res.writeHead(204, 头);
       return res.end();
     }
-    if (req.method === 'GET') return 处理读取(req, res);
-    if (req.method === 'POST') return 处理新增(req, res);
 
-    // PATCH / DELETE / PUT 属第 4 周（今天不做），明确回 405 而不是 404：
-    // 「这个地址有服务，只是不接受这个方法」和「没这个地址」是两回事，排错时区别很大
-    return 失败(res, 405, 'METHOD_NOT_ALLOWED', `该接口只支持 GET 与 POST，收到 ${req.method}`);
+    // 集合端点：GET 读 / POST 写
+    if (是集合) {
+      if (req.method === 'GET') return 处理读取(req, res);
+      if (req.method === 'POST') return 处理新增(req, res);
+      // 集合端点只收 GET/POST；PATCH/DELETE 必须带上 entry_id 走单项端点
+      return 失败(res, 405, 'METHOD_NOT_ALLOWED', `该接口只支持 GET 与 POST，收到 ${req.method}`);
+    }
+
+    // 单项端点 /api/favorites/{entry_id}：PATCH 改备注 / DELETE 取消收藏
+    if (req.method === 'PATCH') return 处理修改(req, res, 子段);
+    if (req.method === 'DELETE') return 处理删除(req, res, 子段);
+    return 失败(res, 405, 'METHOD_NOT_ALLOWED', `单项端点 /api/favorites/{entry_id} 只支持 PATCH 与 DELETE，收到 ${req.method}`);
   };
 }
 

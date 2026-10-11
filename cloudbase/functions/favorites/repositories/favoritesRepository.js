@@ -185,6 +185,87 @@ function 建网关仓库({ 环境ID, 密钥 } = {}) {
       }
       return { entry_id: 一.entry_id, created_at: 收成UTC(一.created_at) };
     },
+
+    // 局部修改（PATCH）：更新这条收藏的备注。按 (user_id, entry_id) 定位，
+    // 顺带用 user_id 过滤 = 只能改「自己的」收藏（鉴权在数据层完成）
+    async 改备注(user_id, entry_id, remark) {
+      const url =
+        `/favorites?user_id=eq.${encodeURIComponent(user_id)}` +
+        `&entry_id=eq.${encodeURIComponent(entry_id)}`;
+      const 响应 = await fetch(基址 + url, {
+        method: 'PATCH',
+        headers: {
+          authorization: 'Bearer ' + key,
+          'content-type': 'application/json',
+          accept: 'application/json',
+          prefer: 'return=representation',
+        },
+        body: JSON.stringify({ remark }),
+      });
+      const 文本 = await 响应.text();
+      if (!响应.ok) {
+        let 说明 = 文本.slice(0, 300);
+        try {
+          const j = JSON.parse(文本);
+          说明 = j.message || (j.error && j.error.message) || 说明;
+        } catch (e) {
+          /* 非 JSON 直接用原文 */
+        }
+        const err = new Error(`网关 ${响应.status}：${说明}`);
+        err.code = '网关' + 响应.status;
+        err.sqlstate = 挖SQLSTATE(文本) || 挖头SQLSTATE(响应.headers);
+        throw err;
+      }
+      // PostgREST PATCH + return=representation 返回「被改的行」数组；0 行 = 没这条
+      const 行 = JSON.parse(文本);
+      const 一 = Array.isArray(行) ? 行[0] : 行;
+      if (!一 || !一.entry_id) {
+        const err = new Error('未找到该收藏：entry_id=' + entry_id + '（可能已被取消，或不属于当前用户）');
+        err.code = 'NOT_FOUND';
+        err.sqlstate = 'NOT_FOUND';
+        throw err;
+      }
+      return { entry_id: 一.entry_id, remark: 一.remark, created_at: 收成UTC(一.created_at) };
+    },
+
+    // 删除（DELETE）：取消一条收藏。与改备注同一套定位 + 鉴权逻辑
+    async 移除(user_id, entry_id) {
+      const url =
+        `/favorites?user_id=eq.${encodeURIComponent(user_id)}` +
+        `&entry_id=eq.${encodeURIComponent(entry_id)}`;
+      const 响应 = await fetch(基址 + url, {
+        method: 'DELETE',
+        headers: {
+          authorization: 'Bearer ' + key,
+          accept: 'application/json',
+          prefer: 'return=representation',
+        },
+      });
+      const 文本 = await 响应.text();
+      if (!响应.ok) {
+        let 说明 = 文本.slice(0, 300);
+        try {
+          const j = JSON.parse(文本);
+          说明 = j.message || (j.error && j.error.message) || 说明;
+        } catch (e) {
+          /* 非 JSON 直接用原文 */
+        }
+        const err = new Error(`网关 ${响应.status}：${说明}`);
+        err.code = '网关' + 响应.status;
+        err.sqlstate = 挖SQLSTATE(文本) || 挖头SQLSTATE(响应.headers);
+        throw err;
+      }
+      // PostgREST DELETE + return=representation 返回「被删的行」数组；0 行 = 没这条
+      const 行 = JSON.parse(文本);
+      const 一 = Array.isArray(行) ? 行[0] : 行;
+      if (!一 || !一.entry_id) {
+        const err = new Error('未找到该收藏：entry_id=' + entry_id + '（可能已被取消，或不属于当前用户）');
+        err.code = 'NOT_FOUND';
+        err.sqlstate = 'NOT_FOUND';
+        throw err;
+      }
+      return { entry_id: 一.entry_id };
+    },
   };
 }
 
@@ -242,6 +323,50 @@ function 建pg仓库(连接串) {
       } catch (e) {
         // pg 驱动把 SQLSTATE 放在 e.code（23505 / 23503），统一挂到 sqlstate 上，
         // 两种通路就能共用同一个错误翻译
+        e.sqlstate = e.sqlstate || e.code;
+        throw e;
+      }
+    },
+
+    // 局部修改（PATCH）：更新备注；0 行 = 没这条收藏 → 404
+    async 改备注(user_id, entry_id, remark) {
+      try {
+        const 行 = await 查询(
+          `UPDATE public.favorites SET remark = $1
+           WHERE user_id = $2 AND entry_id = $3
+           RETURNING entry_id,
+                     remark,
+                     to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at`,
+          [remark, user_id, entry_id]
+        );
+        if (行.length === 0) {
+          const err = new Error('未找到该收藏：entry_id=' + entry_id + '（可能已被取消，或不属于当前用户）');
+          err.code = 'NOT_FOUND';
+          err.sqlstate = 'NOT_FOUND';
+          throw err;
+        }
+        return 行[0];
+      } catch (e) {
+        e.sqlstate = e.sqlstate || e.code;
+        throw e;
+      }
+    },
+
+    // 删除（DELETE）：取消一条收藏；0 行 = 没这条 → 404
+    async 移除(user_id, entry_id) {
+      try {
+        const 行 = await 查询(
+          `DELETE FROM public.favorites WHERE user_id = $1 AND entry_id = $2 RETURNING entry_id`,
+          [user_id, entry_id]
+        );
+        if (行.length === 0) {
+          const err = new Error('未找到该收藏：entry_id=' + entry_id + '（可能已被取消，或不属于当前用户）');
+          err.code = 'NOT_FOUND';
+          err.sqlstate = 'NOT_FOUND';
+          throw err;
+        }
+        return 行[0];
+      } catch (e) {
         e.sqlstate = e.sqlstate || e.code;
         throw e;
       }

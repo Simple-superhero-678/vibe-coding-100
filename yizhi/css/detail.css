@@ -369,7 +369,52 @@ span.fav-open:hover .fav-name{color:var(--ink-2)}
   cursor:pointer;
   transition:color .16s var(--ease),border-color .16s var(--ease);
 }
-.fav-remove:hover{color:var(--cinnabar);border-color:var(--cinnabar)}
+  .fav-remove:hover{color:var(--cinnabar);border-color:var(--cinnabar)}
+
+/* —— 二次确认弹层（Day 22）——
+   和详情 / 收藏面板同一张宣纸：hairline 界栏、墨字、朱砂只用在「确定移除」上。
+   不动圆角 / 阴影 / emoji，和全站纪律一致。 */
+.confirm-dialog{
+  width:min(420px, calc(100vw - 32px));
+  margin:auto;
+  padding:24px 26px 22px;
+  border:1px solid var(--hairline);
+  background:var(--paper);
+  color:var(--ink);
+}
+.confirm-dialog::backdrop{background:rgba(31,27,24,.34)}
+.confirm-title{
+  margin:0 0 8px;
+  font-family:var(--serif);font-weight:400;
+  font-size:19px;letter-spacing:.1em;color:var(--ink);
+}
+.confirm-title::before{
+  content:"";display:inline-block;
+  width:7px;height:7px;background:var(--cinnabar);
+  margin-right:11px;vertical-align:.12em;
+}
+.confirm-text{
+  margin:0 0 20px;
+  font-size:13.5px;line-height:1.9;color:var(--ink-2);letter-spacing:.03em;
+}
+.confirm-acts{
+  display:flex;justify-content:flex-end;gap:12px;
+}
+.confirm-ok,.confirm-cancel{
+  appearance:none;-webkit-appearance:none;
+  font-family:var(--serif);font-size:14px;letter-spacing:.14em;
+  background:transparent;cursor:pointer;
+  padding:8px 18px 9px;
+  transition:color .16s var(--ease),border-color .16s var(--ease),background-color .16s var(--ease);
+}
+.confirm-ok{
+  color:var(--cinnabar);border:1px solid var(--cinnabar);
+}
+.confirm-ok:hover{background:var(--cinnabar);color:var(--paper)}
+.confirm-cancel{
+  color:var(--ink);border:1px solid var(--hairline);
+}
+.confirm-cancel:hover{border-color:var(--ink-2)}
 
 /* 浮层里的「加载中」：骨架整套复用视图台的（.skeleton / .sk-line / .sk-hint），
    只把 margin-top 收掉 —— 视图台那个 18px 是为了与上方工具条拉开，

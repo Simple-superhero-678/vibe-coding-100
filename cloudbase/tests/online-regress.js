@@ -13,6 +13,10 @@
  *   GET  /api/hot?limit=2
  *   POST /api/favorites                      （201 新增；重复再打一次应 409 FAV_DUPLICATE）
  *   PUT  /api/favorites                      （405 方法不支持）
+ *   —— Day 22 新增 ——
+ *   POST /api/favorites（PATCH 用例专用新增）
+ *   PATCH /api/favorites/{id}（改备注 → 200；缺 remark → 400；不存在 → 404）
+ *   DELETE /api/favorites/{id}（删掉 → 200；再删 → 404 幂等）
  *
  * 结果同时写 tmp/day19-截图/线上返回.json，供作业截图用。
  */
@@ -28,6 +32,9 @@ const 输出 = path.resolve(__dirname, '..', '..', 'tmp', 'day19-截图', '线�
 
 // Day 20：写入用例改用带时间戳的唯一 id —— 固定 id 会在第二次跑回归时撞 409（Day 19 的残留已实证）
 const 写入ID = 'yishou-regress-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+// Day 22：PATCH / DELETE 回归专用 id —— 单独一套，避免和上面的 409 用例互相踩
+const 改删ID = 'yishou-patchdel-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+const 假ID = 'yishou-not-exist-' + Date.now().toString(36);
 const 清单 = [
   { 名: 'GET /api/health', method: 'GET', 路径: '/api/health' },
   { 名: 'GET /api/favorites（无身份）', method: 'GET', 路径: '/api/favorites' },
@@ -38,6 +45,13 @@ const 清单 = [
   { 名: 'POST /api/favorites（新增）', method: 'POST', 路径: `/api/favorites?user_id=${UUID}`, 体: { entry_id: 写入ID } },
   { 名: 'POST /api/favorites（重复 → 409）', method: 'POST', 路径: `/api/favorites?user_id=${UUID}`, 体: { entry_id: 写入ID } },
   { 名: 'PUT /api/favorites（405）', method: 'PUT', 路径: `/api/favorites?user_id=${UUID}` },
+  // —— Day 22：PATCH / DELETE 闭环 ——
+  { 名: 'POST /api/favorites（PATCH用例新增）', method: 'POST', 路径: `/api/favorites?user_id=${UUID}`, 体: { entry_id: 改删ID } },
+  { 名: 'PATCH /api/favorites/{id}（改备注 → 200）', method: 'PATCH', 路径: `/api/favorites/${改删ID}?user_id=${UUID}`, 体: { remark: '回归测试备注：玄武复仇桥段' } },
+  { 名: 'PATCH /api/favorites/{id}（缺 remark → 400）', method: 'PATCH', 路径: `/api/favorites/${改删ID}?user_id=${UUID}`, 体: {} },
+  { 名: 'PATCH /api/favorites/{不存在}（→ 404）', method: 'PATCH', 路径: `/api/favorites/${假ID}?user_id=${UUID}`, 体: { remark: 'x' } },
+  { 名: 'DELETE /api/favorites/{id}（删掉 → 200）', method: 'DELETE', 路径: `/api/favorites/${改删ID}?user_id=${UUID}` },
+  { 名: 'DELETE /api/favorites/{id}（再删 → 404）', method: 'DELETE', 路径: `/api/favorites/${改删ID}?user_id=${UUID}` },
 ];
 
 async function 跑一条(例) {
@@ -76,9 +90,9 @@ async function 跑一条(例) {
   fs.writeFileSync(输出, JSON.stringify({ 抓取时间: new Date().toISOString(), 基址, 结果: 全 }, null, 2), 'utf8');
   console.log(`已写入 ${输出}`);
 
-  const 期 = [200, 401, 400, 200, 200, 200, 201, 409, 405];
+  const 期 = [200, 401, 400, 200, 200, 200, 201, 409, 405, 201, 200, 400, 404, 200, 404];
   const 实 = 全.map((x) => x.状态码);
   console.log(`状态码期望：${期.join(' ')}`);
   console.log(`状态码实得：${实.join(' ')}`);
-  console.log(JSON.stringify(期) === JSON.stringify(实) ? '==== 线上回归：9 / 9 符合预期 ====' : '❌ 有不符合预期的状态码');
+  console.log(JSON.stringify(期) === JSON.stringify(实) ? `==== 线上回归：${期.length} / ${期.length} 符合预期 ====` : '❌ 有不符合预期的状态码');
 })();

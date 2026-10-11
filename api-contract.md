@@ -1,6 +1,6 @@
 # API 契约（api-contract.md）
 
-> **状态：Day 17 —— 第一个读接口已上线（`GET /api/favorites` + `GET /api/hot`）。**
+> **状态：Day 22 —— 增删改查四类接口已闭环（`GET`/`POST` Day 17–18，`PATCH`/`DELETE` Day 22）。**
 > 这份文件是**第 3 周（Day 16 起）建表与写接口的唯一依据**，接口形状以此为准，实现见各自的 Day。
 > 已完成：`GET /api/health`（Day 15）· `users` / `favorites` 两张表 + 种子数据（Day 16，脚本在 `db/`）· `GET /api/favorites`、`GET /api/hot`（Day 17，代码在 `cloudbase/functions/`）。
 > ⚠️ **表结构的唯一真源是本文件 §2**。改表的顺序：**先改这里 → 再改 `db/schema.sql` → 再到控制台执行**，否则契约与数据库会漂移。
@@ -19,7 +19,7 @@
 | 后端形态 | **B2 · 云函数 + 云数据库**（Day 16 定案，见 §5） |
 | 数据库 | CloudBase **PostgreSQL**（「SQL 型数据库」，schema `public`） |
 | 已建数据表 | `users` / `favorites`（Day 16；脚本 `db/schema.sql` + `db/seed.sql`，步骤见 `db/README.md`） |
-| 已实现接口 | `GET /api/health`（Day 15）· `GET /api/favorites`、`GET /api/hot`（Day 17）· **`POST /api/favorites`（Day 18）** |
+| 已实现接口 | `GET /api/health`（Day 15）· `GET /api/favorites`、`GET /api/hot`（Day 17）· `POST /api/favorites`（Day 18）· **`PATCH /api/favorites/{entry_id}` 与 `DELETE /api/favorites/{entry_id}`（`remark` 备注改/删，Day 22）** |
 | 未处理 | ⚠️ **RLS 未配**（CloudBase PG 的 `public` schema 可被 PostgREST 访问，权限需靠 RLS 兜住）· ⚠️ **跨域**：Day 17 已在函数侧回 `access-control-allow-origin`，网关侧「跨域设置」仍待配（前端接入时确认） |
 
 页面需要后端的原因只有一个：**收藏现在只存在浏览器本地（localStorage），换设备就没了**。除此之外的读取（五部 JSON）都是静态文件，不需要接口。
@@ -101,11 +101,13 @@
 | `id` | uuid | 主键，`DEFAULT gen_random_uuid()` | 行主键 |
 | `user_id` | uuid | `NOT NULL`，外键 → `users.id`，`ON DELETE CASCADE` | 谁的收藏 |
 | `entry_id` | text | `NOT NULL`，长度 1–64 且非空白 | 条目 id（如 `yishou-001`），**与 `data/*.json` 里的 `id` 完全一致** |
+| `remark` | text | 可空，去空白后长度 ≤ 500 | 用户给这条收藏写的备注（Day 22 加）；`PATCH /api/favorites/{entry_id}` 可改，`GET` 列表**不返回**它（保持列表只读 id+时间，前端拿 id 现读现用） |
 | `created_at` | timestamptz | `NOT NULL DEFAULT now()` | 收藏时间，列表按它排序 |
 
 - **唯一约束**：`UNIQUE (user_id, entry_id)` —— 防重复收藏。⚠️ 这不只是「防手滑」：它是 `409 FAV_DUPLICATE` 的**数据层保证**，光靠云函数写 `if (已收藏)` 在并发下会双插。
 - **索引**：⚠️ **不单独建 `user_id` 索引**（v0.1 原写「给 `user_id` 建索引」，Day 16 修正）—— 上面的唯一约束已生成一个**以 `user_id` 为前导列**的索引，「按 `user_id` 查」直接命中；再建单列索引是纯冗余（白占空间、拖慢写入）。
 - **删除行为**：`ON DELETE CASCADE` —— 注销用户时数据库自动删掉他的全部收藏（§3.4 要的行为），不用云函数写两条删语句、也就不会漏删留脏数据。
+- **`remark` 列（Day 22 加）**：可空 `text`，`favorites_remark_len` 约束限 ≤500 字；它是 `favorites` 表里唯一可改的业务字段，专门用来闭合 `PATCH`（局部改备注）。它不存储条目内容，不改变「条目真源仍是 `data/*.json`」的红线（§2.2 开头那条）。
 - ⚠️ `entry_id` **不建外键**：条目不在数据库里（真源是 `data/*.json`）。后果是可能指向已删除的条目 → **接口不做校验**，前端显示「此条已下架」并允许移除（`TECH_DESIGN.md` §12.4 已有该态）。
 
 ### 2.3 `events` — 浏览/搜索埋点（**可选，今天不建**）
@@ -143,7 +145,8 @@
 | **`/api/favorites`** | **GET** | **收藏列表读取（列表读取接口）** | 是（Day 17 临时 `user_id`） | ✅ **Day 17 已实现** |
 | **`/api/hot`** | **GET** | **收藏热门榜（Day 17 新增）** | 否 | ✅ **Day 17 已实现** |
 | **`/api/favorites`** | **POST** | **新增一条收藏（写入接口）** | 是（Day 17 临时 `user_id`） | ✅ **Day 18 已实现** |
-| `/api/favorites/{entry_id}` | DELETE | 取消一条收藏 | 是 | 占位（第 4 周） |
+| **`/api/favorites/{entry_id}`** | **PATCH** | **改一条收藏的备注（局部修改）** | 是（Day 17 临时 `user_id`） | ✅ **Day 22 已实现** |
+| **`/api/favorites/{entry_id}`** | **DELETE** | **取消一条收藏** | 是 | ✅ **Day 22 已实现（原占位）** |
 | `/api/favorites/sync` | PUT | 批量覆盖（本地收藏迁到账号） | 是 | 占位 |
 | `/api/events` | POST | 埋点（可选） | 否 | 占位 |
 | `/api/entries` | GET | 条目列表读取（可选） | 否 | 占位 |
@@ -301,7 +304,34 @@
 
 ---
 
-### 3.7 `DELETE /api/favorites/{entry_id}` — 取消一条收藏
+### 3.7 `PATCH /api/favorites/{entry_id}` — 改一条收藏的备注 ✅ 已实现（Day 22）
+
+- **认证**：是（沿用 Day 17 临时口径，见 §1）
+- **请求参数**：路径参数 `entry_id`（校验：非空、不含 `/`、≤64 字符；否则 `400`）
+- **请求体**：
+
+  ```json
+  { "remark": "想写进小说的玄武复仇桥段" }
+  ```
+
+- **请求校验**：`remark` 字段**必填**（缺 → `400`）· 必须是字符串（非字符串 → `400`）· 去空白后长度 ≤ 500（超 → `400`）。
+  只认 `remark` 这一个字段，**其余字段一律忽略**（局部改，不整行覆盖）。
+- **响应 200**：
+
+  ```json
+  { "ok": true, "data": { "entry_id": "yishou-001", "remark": "想写进小说的玄武复仇桥段", "created_at": "2026-10-06T16:00:00Z" } }
+  ```
+
+  ⚠️ `created_at` 是**该收藏的创建时间，不会因改备注而变**（PATCH 只改 `remark`，不动创建时间）。
+- **命中 0 行 → `404 FAV_NOT_FOUND`**（带中文说明，点名 `entry_id`，如「没有找到 yishou-001 的收藏记录，可能已经被取消」），让前端区分「没这条收藏」与「改失败」。
+- **错误**：`400 BAD_REQUEST`（缺 `remark` / 非字符串 / 超 500 字 / 路径 `entry_id` 非法）· `401 UNAUTHORIZED` · `404 FAV_NOT_FOUND` · `500 INTERNAL`
+- **数据通路（Day 22 定案）**：网关通路走 `PATCH /favorites?user_id=eq.<uid>&entry_id=eq.<eid>` + `Prefer: return=representation`，返回数组取第一项；`pg` 通路走 `UPDATE … RETURNING entry_id, remark, to_char(created_at …) AS created_at`，0 行 → `NOT_FOUND`。两条通路返回形状一致。
+  ⚠️ **实测坑**：PostgREST 网关对新增的 `remark` 列需要 schema 缓存刷新，否则 PATCH 报「column remark does not exist」—— 详见 `cloudbase/README.md` 已知坑补充。
+- **前端在哪用**：`store.js` 将来接后端时的「改备注」入口（收藏面板里给某条收藏加 / 改备注）。当前前端（Day 22）仍是纯 localStorage，未接此接口。
+
+---
+
+### 3.7.5 `DELETE /api/favorites/{entry_id}` — 取消一条收藏 ✅ 已实现（Day 22）
 
 - **认证**：是
 - **请求参数**：路径参数 `entry_id`
@@ -442,6 +472,7 @@
 | 日期 | 版本 | 变更 |
 |---|---|---|
 | 2026-10-08（Day 18 · 部署实测） | v0.4 | **第一个写接口上线并通过公网验证**：§3.6 `POST /api/favorites` 标记已实现（与 `GET /api/favorites` 同一个云函数，按方法分流）。三条验证全部对上契约 —— 正常写入 `201` / 重复提交 `409 FAV_DUPLICATE` / 缺必填字段 `400` + 中文提示；数据库侧确认「写进去的读得出来」（`GET` 的 `total` 与表行数一致，重复请求不增行）。补记三处口径 —— ① §3.6 请求校验细则（空白 / 超 64 字 / 体非 JSON 一律 400，提示必须中文点名缺什么）；② §3.6 明确「防重复靠数据库唯一约束而非函数里的先查再插」；③ §1 临时认证口径由「Day 18 删」改为「**待 `POST /api/auth/session` 落地后删**」（Day 18 当天选择先做写接口，未做 auth）。§3 错误码补登 `405`。⚠️ **实测发现**：PG 网关口回的唯一冲突码是 `DATABASE_23505`（带前缀）而不是裸 `23505`，函数需归一化后再判，否则「重复收藏」会被当成 `500` 回给前端 —— 详细排错见 `cloudbase/README.md` |
+| 2026-10-11（Day 22 · 部署实测） | v0.5 | **写接口补齐全：PATCH + DELETE 上线，聚成「增删改查」四类操作闭环**（Day 17 GET / Day 18 POST / Day 22 PATCH·DELETE）。具体：① `public.favorites` 加 `remark` 列（可空、≤500 字，迁移 `20261011180000_add_remark`）；② `PATCH /api/favorites/{entry_id}` 局部改备注（只认 `remark` 字段，命中 0 行→404 中文）；③ `DELETE /api/favorites/{entry_id}` 落地契约 §3.7（命中 0 行→404 `FAV_NOT_FOUND`，幂等）；④ 路由支持 `/api/favorites/{entry_id}`（集合端点仅 GET/POST、单项端点仅 PATCH/DELETE，方法不对一律 405）；⑤ 前端 `store.js` 删除路径加二次确认；⑥ 三道闸门复跑：api-local-test 122/122、refactor-fingerprint 22/22 不变、online-regress 补 2 例。⚠️ **实测说明**：PostgREST 网关对新列 `remark` 的 schema 缓存 —— 本次迁移（`20261011180000_add_remark`）后即生效，线上 PATCH 直接成功，未触发「column remark does not exist」，无需手动刷缓存（若以后真遇到该错再走 `NOTIFY` 刷新，见 README 已知坑）。 |
 | 2026-10-07（Day 17 · 部署实测） | v0.3.1 | **两个读接口上线并通过公网验证**：`GET /api/favorites` / `GET /api/hot` 已挂到默认域名（HTTP 网关，上游类型 `WEB_SCF`）。**数据通路定案**：优先 CloudBase PG HTTP 网关 + 环境 API Key（`service_role`，仅服务端），`PG_URL` 配了则切回 `pg` 直连；§3.5 补记 `created_at` 归一化与 `total` 的两种取法。⚠️ 网关是 PostgREST 形态，**不支持 `GROUP BY`**，`/api/hot` 的聚合在函数内完成（契约 §3.11 记账）。实现与排错见 `cloudbase/README.md` |
 | 2026-10-07（Day 17） | v0.3 | **第一个读接口落地**：§3.5 `GET /api/favorites` 标记已实现（代码 `cloudbase/functions/favorites/index.web.js`），补记三处实现口径 —— ① `total` 需额外 `count(*)`（表里没有总数列）；② 排序补 `id` 兜底（`created_at` 非唯一键）；③ `created_at` 由 `to_char` 产出无毫秒 ISO 串。**新增 §3.11 `GET /api/hot`**（收藏热门榜，Day 17 拍板改口径：不接外部热搜）。**新增 §1 临时认证口径**（无 token 时认 `?user_id=`，Day 18 删）。§3 错误码补登 `405 METHOD_NOT_ALLOWED`。§0 更新已实现接口与 CORS 现状 |
 | 2026-10-07（Day 16） | v0.2 | §2 表结构与数据库对齐：`users` 加 `UNIQUE(provider, provider_uid)`；`favorites` 外键补 `ON DELETE CASCADE`、`entry_id` 补长度 CHECK、**修正索引口径（不单独建 `user_id` 索引）**；§0 补后端形态/数据库/已建表；§5 B1/B2 定案为 **B2**。实现见 `db/schema.sql` + `db/seed.sql`，步骤见 `db/README.md` |

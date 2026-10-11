@@ -20,7 +20,7 @@
 | 函数名 | 路由 | 认证 | 读什么 | 说明 |
 |---|---|---|---|---|
 | `health` | `GET /api/health` | 否 | 不连库 | 存活探针，只回 `{"ok":true,"service":"yishou"}`（Day 15） |
-| `favorites` | `GET` + `POST` `/api/favorites` | 是（临时 `user_id`） | `public.favorites` | **读**：收藏列表读取，支持 `limit`/`offset`（Day 17）· **写**：新增一条收藏（Day 18，同一个函数按方法分流） |
+| `favorites` | `GET` + `POST` + `PATCH` + `DELETE` `/api/favorites` | 是（临时 `user_id`） | `public.favorites` | **读** GET（Day 17）· **写** POST 新增（Day 18）· **改** PATCH 局部改备注（Day 22，路径 `/api/favorites/{entry_id}`，只认 `remark`）· **删** DELETE 取消收藏（Day 22） |
 | `hot` | `GET /api/hot` | 否 | `public.favorites` 聚合 | 「收藏热门榜」：被收藏最多的条目 Top N（Day 17，口径见下） |
 
 > **关于 `hot` 的名字**：清单里的「热搜」是打卡课程模板（打卡 App 示例）的说法。本项目（异兽志）没有外部热搜需求，
@@ -299,6 +299,47 @@ Post '{}'                            # 400
 > 随手编一个 uuid 会被 `favorites.user_id` 的外键拦住 → 23503 → **400 `BAD_REQUEST`**。
 > 这是**正确行为**（接口在告诉你「收藏要挂在真实用户上」），但会让人误以为写入坏了。
 
+## 验证记录（Day 22 · PATCH / DELETE 上线 · 2026-10-11）
+
+`PATCH /api/favorites/{entry_id}` 与 `DELETE /api/favorites/{entry_id}` 上线并实测通过（部署见上；路由支持 `/api/favorites/{entry_id}`，集合端点只收 GET/POST、单项端点只收 PATCH/DELETE，错位一律 405）。
+
+**线上回归（`node cloudbase/tests/online-regress.js`，已扩到 15 例）全绿**：
+
+| 接口 | HTTP | 响应 |
+|---|---|---|
+| `GET /api/health` | 200 | `{"ok":true,"service":"yishou"}` |
+| `GET /api/favorites?limit=abc` | 400 | `limit 必须是整数` |
+| `GET /api/favorites?user_id=1111…` | 200 | `{"ok":true,"data":{"total":15,…}}` |
+| `POST /api/favorites`（新增） | 201 | `{"ok":true,"data":{"entry_id":"yishou-patchdel-…","created_at":"…Z"}}` |
+| `POST /api/favorites`（重复） | 409 | `FAV_DUPLICATE` |
+| `PUT /api/favorites` | 405 | `METHOD_NOT_ALLOWED` |
+| `PATCH /api/favorites/{id}`（改备注） | **200** | `{"ok":true,"data":{"entry_id":"…","remark":"回归测试备注：玄武复仇桥段","created_at":"…Z"}}` |
+| `PATCH /api/favorites/{id}`（缺 remark） | 400 | `PATCH 只能修改 remark（备注）字段，请求体里没带 remark` |
+| `PATCH /api/favorites/{不存在}` | 404 | `FAV_NOT_FOUND` |
+| `DELETE /api/favorites/{id}`（删掉） | **200** | `{"ok":true,"data":{"removed":true}}` |
+| `DELETE /api/favorites/{id}`（再删） | 404 | `FAV_NOT_FOUND`（幂等） |
+
+> 截图级证据见 `tmp/day22-验证/proof.html`（`node cloudbase/tests/day22-proof.js` 生成）—— 含「PATCH 前后备注变化」与「DELETE 前后 GET 列表里该条消失」两张证据，以及数据库 `SELECT` 前后对比 SQL。
+> ⚠️ 无头浏览器画不出**地址栏** —— 交给老师的图请在真浏览器里点开链接再截（默认域名有 1 秒倒计时中间页，先点「确定访问」）。
+
+**数据库 select 前后对比验证法**（兜底核对，证明「写进去的读得出来 / 删掉的真的没了」）：
+
+```sql
+-- 改备注【前】vs【后】
+SELECT entry_id, remark FROM public.favorites
+WHERE user_id='11111111-1111-4111-8111-111111111111' AND entry_id='<本次测试 id>';
+-- 前：remark 为 NULL；后：remark = '…'
+
+-- 删除【前】vs【后】
+SELECT count(*) FROM public.favorites
+WHERE user_id='11111111-1111-4111-8111-111111111111' AND entry_id='<本次测试 id>';
+-- 前：1；后：0
+```
+
+🔴 **Day 22 部署踩到的真坑（已修，记入「已知坑」）**：`favorites` 重新部署后所有路径 404「没有这个接口：/」。
+根因 = CloudBase HTTP 网关把路由前缀剥掉后**只转发相对路径**（`/` 或 `/{id}`），而 `favorites` 路由代码只认完整路径 `/api/favorites…`。
+`health` 函数早就写了「完整路径 / 剥前缀两种都放行」的兼容写法（`cloudbase/functions/health/index.web.js`），`favorites` 这次补齐 —— 见下方「已知坑」。
+
 ## 备选部署路径（控制台 · Web 函数）
 
 控制台路径同样可行，代码一字不用改：**创建云函数 → 模板 HTTP 云函数 → Node.js Hello World** →
@@ -359,3 +400,4 @@ Post '{}'                            # 400
   排查提示：「明明数据库约束拦住了，接口却回 500」= 十有八九是这层前缀没剥。
 - ⚠️ 两个函数都做「前缀是否被剥掉」的兜底，所以各自只会处理自己的路径；`favorites` 收到 `/api/hot` 会回 404（本机自测里有这条）。
 - ⚠️ `updateFunctionConfig` 下发环境变量后**不需要重新部署代码**，配置变更即时生效；但**改了 `index.web.js` 就必须重新 deploy**。
+- 🔴 **Day 22 真坑（已修）：CloudBase HTTP 网关转发给函数的是「剥掉路由前缀后的相对路径」** —— `/api/favorites` 进函数变成 `/`、`/api/favorites/{id}` 变成 `/{id}`，**不是**完整路径。函数路由代码必须像 `health` 那样兼容两种形态（完整 `/api/favorites…` 与相对 `/` `/{id}`），否则部署后所有路径 404「没有这个接口：/」。`favorites` 这次已补齐双兼容；排查时先看函数日志里 `req.url` 到底收到什么。

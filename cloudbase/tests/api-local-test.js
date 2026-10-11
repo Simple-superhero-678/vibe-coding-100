@@ -77,6 +77,31 @@ function 造假查询者(记录, 选项 = {}) {
       收藏表.push({ user_id, entry_id, created_at: 新行时间 });
       return { entry_id, created_at: 新行时间 };
     },
+    // Day 22：PATCH/DELETE 也要能「改完/删完再读回」
+    async 改备注(user_id, entry_id, remark) {
+      记录.push({ 方法: '改备注', 参数: [user_id, entry_id, remark] });
+      const 行 = 收藏表.find((r) => r.user_id === user_id && r.entry_id === entry_id);
+      if (!行) {
+        const e = new Error('未找到该收藏：entry_id=' + entry_id + '（可能已被取消，或不属于当前用户）');
+        e.code = 'NOT_FOUND';
+        e.sqlstate = 'NOT_FOUND';
+        throw e;
+      }
+      行.remark = remark;
+      return { entry_id: 行.entry_id, remark: 行.remark, created_at: 行.created_at };
+    },
+    async 移除(user_id, entry_id) {
+      记录.push({ 方法: '移除', 参数: [user_id, entry_id] });
+      const idx = 收藏表.findIndex((r) => r.user_id === user_id && r.entry_id === entry_id);
+      if (idx < 0) {
+        const e = new Error('未找到该收藏：entry_id=' + entry_id + '（可能已被取消，或不属于当前用户）');
+        e.code = 'NOT_FOUND';
+        e.sqlstate = 'NOT_FOUND';
+        throw e;
+      }
+      收藏表.splice(idx, 1);
+      return { entry_id };
+    },
   };
 }
 
@@ -235,7 +260,7 @@ let 全局原fetch;
     const 乙 = await 取(a.基址, `/api/favorites?user_id=${用户1}`, { method: 'OPTIONS' });
     断言('favorites 10/ OPTIONS → 204（预检放行）', 乙.状态 === 204, String(乙.状态));
     const 丙 = await 取(a.基址, '/api/favorites/nope');
-    断言('favorites 10/ 未知子路径 → 404 NOT_FOUND', 丙.状态 === 404 && 丙.体.error.code === 'NOT_FOUND', JSON.stringify(丙.体));
+    断言('favorites 10/ /api/favorites/{id} 用 GET 打 → 405（单项端点只收 PATCH/DELETE）', 丙.状态 === 405 && 丙.体.error.code === 'METHOD_NOT_ALLOWED', JSON.stringify(丙.体));
     const 丁 = await 取(a.基址, '/api/hot');
     断言('favorites 10/ 收到 /api/hot 不越权处理 → 404', 丁.状态 === 404, String(丁.状态));
   }
@@ -375,6 +400,95 @@ let 全局原fetch;
     );
     断言('favorites 11/ message 给出可操作的排查方向（提到白名单/VPC）', /白名单|VPC/.test(r.体.error.message), r.体.error.message);
     b.服务.close();
+  }
+
+  /* ============ 一之三、PATCH/DELETE（Day 22） ============ */
+  {
+    // PATCH：给一条已有收藏写备注，应返回更新后的行
+    const r = await 取(a.基址, `/api/favorites/yishou-001?user_id=${用户1}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ remark: '今日二刷，比初读更有味道' }),
+    });
+    断言('PATCH 1/ 正常改备注 → 200', r.状态 === 200, String(r.状态) + ' ' + JSON.stringify(r.体));
+    断言('PATCH 1/ ok:true + data 含 entry_id/remark/created_at', r.体.ok === true && r.体.data.entry_id === 'yishou-001' && r.体.data.remark === '今日二刷，比初读更有味道', JSON.stringify(r.体));
+    断言('PATCH 1/ 返回里没有 error 字段', r.体.error === undefined, JSON.stringify(r.体));
+  }
+
+  {
+    // 改完再读：GET 列表里这条的备注应该还在（是「改」，不是「重写整行」）
+    const r = await 取(a.基址, `/api/favorites?user_id=${用户1}`);
+    断言('PATCH 2/ 改完再读：total 仍是 6（PATCH 不增行）', r.体.data.total === 6, `实际 ${r.体.data.total}`);
+  }
+
+  {
+    // PATCH 缺少 remark 字段 → 400
+    const r = await 取(a.基址, `/api/favorites/yishou-001?user_id=${用户1}`, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ foo: 1 }),
+    });
+    断言('PATCH 3/ 体里没有 remark → 400', r.状态 === 400 && r.体.error.code === 'BAD_REQUEST', JSON.stringify(r.体));
+    断言('PATCH 3/ 提示点名 remark', /remark/.test(r.体.error.message), r.体.error.message);
+  }
+
+  {
+    // PATCH remark 非字符串 → 400
+    const r = await 取(a.基址, `/api/favorites/yishou-001?user_id=${用户1}`, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ remark: 123 }),
+    });
+    断言('PATCH 4/ remark 非字符串 → 400', r.状态 === 400 && r.体.error.code === 'BAD_REQUEST', JSON.stringify(r.体));
+  }
+
+  {
+    // PATCH remark 超 500 字 → 400
+    const r = await 取(a.基址, `/api/favorites/yishou-001?user_id=${用户1}`, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ remark: 'x'.repeat(501) }),
+    });
+    断言('PATCH 5/ remark 超 500 字 → 400', r.状态 === 400 && r.体.error.code === 'BAD_REQUEST', JSON.stringify(r.体));
+  }
+
+  {
+    // 改一个不存在的 entry_id → 404 中文
+    const r = await 取(a.基址, `/api/favorites/不存在?user_id=${用户1}`, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ remark: 'x' }),
+    });
+    断言('PATCH 6/ 不存在的 entry_id → 404 FAV_NOT_FOUND', r.状态 === 404 && r.体.error.code === 'FAV_NOT_FOUND', JSON.stringify(r.体));
+    断言('PATCH 6/ 404 提示是中文且点名 entry_id', /entry_id/.test(r.体.error.message), r.体.error.message);
+  }
+
+  {
+    // 无身份 PATCH → 401
+    const r = await 取(a.基址, `/api/favorites/yishou-001`, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ remark: 'x' }),
+    });
+    断言('PATCH 7/ 无身份 → 401', r.状态 === 401 && r.体.error.code === 'UNAUTHORIZED', JSON.stringify(r.体));
+  }
+
+  {
+    // DELETE：取消一条收藏 → 200 {removed:true}
+    const r = await 取(a.基址, `/api/favorites/yishou-001?user_id=${用户1}`, { method: 'DELETE' });
+    断言('DELETE 1/ 正常删除 → 200', r.状态 === 200, String(r.状态) + ' ' + JSON.stringify(r.体));
+    断言('DELETE 1/ ok:true + data.removed === true', r.体.ok === true && r.体.data.removed === true, JSON.stringify(r.体));
+  }
+
+  {
+    // 删完再读：该条不再返回（完成标准「DELETE 后 GET 不再返回」的本机预演）
+    const r = await 取(a.基址, `/api/favorites?user_id=${用户1}`);
+    断言('DELETE 2/ 删完再读：total 6 → 5', r.体.data.total === 5, `实际 ${r.体.data.total}`);
+    断言('DELETE 2/ yishou-001 已从列表消失', !r.体.data.items.some((i) => i.entry_id === 'yishou-001'), JSON.stringify(r.体.data.items.map((i) => i.entry_id)));
+    断言('DELETE 2/ 另一个用户不受影响（仍是 1 条）', (await 取(a.基址, `/api/favorites?user_id=${用户4}`)).体.data.total === 1, '用户4');
+  }
+
+  {
+    // 再删一次刚刚删掉的 → 404（幂等，前端静默当成功）
+    const r = await 取(a.基址, `/api/favorites/yishou-001?user_id=${用户1}`, { method: 'DELETE' });
+    断言('DELETE 3/ 删不存在的 → 404 FAV_NOT_FOUND', r.状态 === 404 && r.体.error.code === 'FAV_NOT_FOUND', JSON.stringify(r.体));
+    断言('DELETE 3/ 提示是中文且点名 entry_id', /entry_id/.test(r.体.error.message), r.体.error.message);
+  }
+
+  {
+    // 无身份 DELETE → 401
+    const r = await 取(a.基址, `/api/favorites/yishou-001`, { method: 'DELETE' });
+    断言('DELETE 4/ 无身份 → 401', r.状态 === 401 && r.体.error.code === 'UNAUTHORIZED', JSON.stringify(r.体));
   }
 
   a.服务.close();
@@ -604,6 +718,49 @@ let 全局原fetch;
     断言('网关 20/ 23514 → 400 BAD_REQUEST', 译2.状态码 === 400 && 译2.code === 'BAD_REQUEST', JSON.stringify(译2));
     const 译3 = 收藏.翻写入错误(Object.assign(new Error('something odd'), { code: 'XX999' }));
     断言('网关 20/ 认不出的错 → 500 INTERNAL', 译3.状态码 === 500 && 译3.code === 'INTERNAL', JSON.stringify(译3));
+  }
+
+  {
+    // 网关通路：PATCH 怎么构造（方法 + 过滤 + Prefer）
+    const 假 = 装假fetch(() => ({
+      ok: true, status: 200, headers: {},
+      文本: JSON.stringify([{ entry_id: 'yishou-001', remark: '笔记', created_at: '2026-10-01T09:12:00+08:00' }]),
+    }));
+    const 网 = 收藏.建默认查询者();
+    const 行 = await 网.改备注(用户1, 'yishou-001', '笔记');
+    假.还原();
+    const 请 = 假.请求[0];
+    断言('网关 21/ PATCH 打到 /v1/rdb/rest/favorites?user_id=eq.&entry_id=eq.', 请.url.includes('/v1/rdb/rest/favorites?user_id=eq.' + 用户1) && 请.url.includes('entry_id=eq.yishou-001'), 请.url);
+    断言('网关 21/ 方法为 PATCH', 请.method === 'PATCH', String(请.method));
+    断言('网关 21/ 带 Prefer: return=representation', 请.headers.prefer === 'return=representation', String(请.headers.prefer));
+    断言('网关 21/ 体里只有 remark（snake_case）', 请.body === JSON.stringify({ remark: '笔记' }), String(请.body));
+    断言('网关 21/ 回的行归一化成契约形态', 行.entry_id === 'yishou-001' && 行.created_at === '2026-10-01T01:12:00Z', JSON.stringify(行));
+  }
+
+  {
+    // 网关通路：DELETE 怎么构造
+    const 假 = 装假fetch(() => ({
+      ok: true, status: 200, headers: {},
+      文本: JSON.stringify([{ entry_id: 'yishou-001' }]),
+    }));
+    const 网 = 收藏.建默认查询者();
+    const 行 = await 网.移除(用户1, 'yishou-001');
+    假.还原();
+    const 请 = 假.请求[0];
+    断言('网关 21/ DELETE 打到过滤 URL', 请.url.includes('/v1/rdb/rest/favorites?user_id=eq.' + 用户1) && 请.url.includes('entry_id=eq.yishou-001'), 请.url);
+    断言('网关 21/ 方法为 DELETE', 请.method === 'DELETE', String(请.method));
+    断言('网关 21/ 同样带 Prefer: return=representation（用于判「删了几行」）', 请.headers.prefer === 'return=representation', String(请.headers.prefer));
+    断言('网关 21/ 返回 {entry_id}', 行.entry_id === 'yishou-001', JSON.stringify(行));
+  }
+
+  {
+    // 网关通路：PATCH/DELETE 命中 0 行 → 抛 NOT_FOUND（接口层转 404）
+    const 假 = 装假fetch(() => ({ ok: true, status: 200, headers: {}, 文本: '[]' }));
+    const 网 = 收藏.建默认查询者();
+    let 抛了 = null;
+    try { await 网.改备注(用户1, 'nomatch', 'x'); } catch (e) { 抛了 = e; }
+    假.还原();
+    断言('网关 21/ 网关回空数组 → 抛 NOT_FOUND（接口层转 404）', 抛了 && 抛了.sqlstate === 'NOT_FOUND', 抛了 && (抛了.sqlstate + ' ' + 抛了.message));
   }
 
   /* ============ 汇总 ============ */

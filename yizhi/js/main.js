@@ -1003,6 +1003,35 @@ function 挂背板关(面板, 关掉) {
   });
 }
 
+/* —— 二次确认（Day 22）——
+   删除比新增更容易出事（删了没提示、点错救不回），所以「取消收藏 / 移除」前先问一句。
+   用原生 <dialog>，和详情 / 收藏面板同一套纸墨语言；用完即删，不堆在 DOM 里。
+   只返回「用户点没点确定」，至于要不要真删交给调用方 —— 这一层只管问。 */
+function 确认删除(名) {
+  return new Promise(决 => {
+    const 框 = document.createElement('dialog');
+    框.className = 'confirm-dialog';
+    框.setAttribute('aria-label', '确认取消收藏');
+    框.innerHTML =
+      '<p class="confirm-title">确定取消收藏？</p>' +
+      '<p class="confirm-text">「' + 名 + '」会从收藏夹移除，此操作不可撤销。</p>' +
+      '<div class="confirm-acts">' +
+        '<button type="button" class="confirm-cancel" data-role="cancel">再想想</button>' +
+        '<button type="button" class="confirm-ok" data-role="ok">确定移除</button>' +
+      '</div>';
+    document.body.append(框);
+    /* 关掉时再判：点「确定移除」置 同意=1，点「再想想」/ Esc 置 0（或空）。
+       清理放 close 回调里（dialog.close 之后才派发，remove 跟着做最稳，见踩坑记录）。 */
+    框.addEventListener('close', () => {
+      决(框.dataset.同意 === '1');
+      框.remove();
+    });
+    框.showModal();
+    框.querySelector('[data-role="ok"]').addEventListener('click', () => { 框.dataset.同意 = '1'; 框.close(); });
+    框.querySelector('[data-role="cancel"]').addEventListener('click', () => { 框.dataset.同意 = '0'; 框.close(); });
+  });
+}
+
 /* —— 收藏切换 ——
    注意这里**不能**因为「条目找不到」就早退：收藏夹里那些已下架的条目，
    恰恰只有这个动作能把它们移掉（TECH_DESIGN §12.4）。
@@ -1013,6 +1042,13 @@ function 挂背板关(面板, 关掉) {
 async function 处理收藏(id, 来源 = '按钮') {
   const 条 = await 确保条目(id);
   const 名 = 条 ? 条.名 : '这条已下架的内容';
+
+  /* Day 22：删除前二次确认。只在「这一下确实会删掉一条收藏」时拦：
+     当前已收藏（store.has 为真）且不是「撤销」复加 —— 加收藏 / 撤销 都直接过，不打断。 */
+  if (来源 !== '撤销' && store.has(id)) {
+    const 同意 = await 确认删除(名);
+    if (!同意) return;   // 用户反悔：界面不动、不报错
+  }
 
   try {
     const 现在 = store.toggle(id);
