@@ -16,7 +16,19 @@ const http = require('http');
 const SERVICE = 'yishou';                 // 项目英文名，与 data/*.json 里 id 前缀（yishou-）一致
 const PORT = process.env.PORT || 9000;    // Web 函数约定端口 9000
 
+// —— Day 24 补位来源：GitHub Pages 的 CORS 头由函数自己补 ——
+// 为什么：免费体验版套餐不允许自助添加「安全域名」（实测 MCP/CLI 均报 CreateAuthDomain 当前套餐无法执行此操作），
+//         网关不会给这个来源反射 CORS 头。函数按【精确来源】自己写一个（只认这一个 origin，不是 * 通配符）。
+// ⚠️ 善后条件：将来若套餐升级、把该域名加进「安全域名」白名单 —— 必须删掉这段补位，
+//    否则「网关反射 + 函数自写」会拼成双值非法头（Day 20 已踩过一次）。
+const 补位来源 = 'https://simple-superhero-678.github.io';
+
 const server = http.createServer((req, res) => {
+  // Day 24 补位：精确来源才补 CORS 头（成功 / 405 / 404 响应都会带上；setHeader 与 writeHead 自动合并）
+  if (req.headers.origin === 补位来源) {
+    res.setHeader('access-control-allow-origin', 补位来源);
+  }
+
   // 只取路径，丢掉查询串
   const path = (req.url || '/').split('?')[0];
 

@@ -1,6 +1,6 @@
 # API 契约（api-contract.md）
 
-> **状态：Day 22 —— 增删改查四类接口已闭环（`GET`/`POST` Day 17–18，`PATCH`/`DELETE` Day 22）。**
+> **状态：Day 24 —— 增删改查四类接口已闭环（`GET`/`POST` Day 17–18，`PATCH`/`DELETE` Day 22）；跨域（CORS）闭环（cbsite 网关反射 + GitHub Pages 函数补位，Day 24）。**
 > 这份文件是**第 3 周（Day 16 起）建表与写接口的唯一依据**，接口形状以此为准，实现见各自的 Day。
 > 已完成：`GET /api/health`（Day 15）· `users` / `favorites` 两张表 + 种子数据（Day 16，脚本在 `db/`）· `GET /api/favorites`、`GET /api/hot`（Day 17，代码在 `cloudbase/functions/`）。
 > ⚠️ **表结构的唯一真源是本文件 §2**。改表的顺序：**先改这里 → 再改 `db/schema.sql` → 再到控制台执行**，否则契约与数据库会漂移。
@@ -20,7 +20,7 @@
 | 数据库 | CloudBase **PostgreSQL**（「SQL 型数据库」，schema `public`） |
 | 已建数据表 | `users` / `favorites`（Day 16；脚本 `db/schema.sql` + `db/seed.sql`，步骤见 `db/README.md`） |
 | 已实现接口 | `GET /api/health`（Day 15）· `GET /api/favorites`、`GET /api/hot`（Day 17）· `POST /api/favorites`（Day 18）· **`PATCH /api/favorites/{entry_id}` 与 `DELETE /api/favorites/{entry_id}`（`remark` 备注改/删，Day 22）** |
-| 未处理 | ⚠️ **RLS 未配**（CloudBase PG 的 `public` schema 可被 PostgREST 访问，权限需靠 RLS 兜住）· ⚠️ **跨域**：Day 17 已在函数侧回 `access-control-allow-origin`，网关侧「跨域设置」仍待配（前端接入时确认） |
+| 未处理 | ⚠️ **RLS 未配**（CloudBase PG 的 `public` schema 可被 PostgREST 访问，权限需靠 RLS 兜住）· ✅ **跨域（CORS）Day 24 已解决**：cbsite 域名由网关反射；GitHub Pages 域名因免费版不允许自助加「安全域名」，由函数侧**精确来源补位**（`health`/`favorites`/`hot` 三函数，见 `cloudbase/README.md` Day 24 记录） |
 
 页面需要后端的原因只有一个：**收藏现在只存在浏览器本地（localStorage），换设备就没了**。除此之外的读取（五部 JSON）都是静态文件，不需要接口。
 
@@ -445,7 +445,7 @@
 | `js/data.js` | `fetch('data/*.json')` 读五部 | **不动**（除非走可选表 `entries`） |
 | 未登录时 | —— | 回落 localStorage，功能不降级；登录后再 `sync` 合并 |
 
-**上线前必须补的两件事**：① 跨域（CORS）配好，否则前端域名调不到接口域名；② token 的存放位置与过期处理（过期 = 回落到本地收藏，且提示一次）。
+**上线前必须补的两件事**：① ~~跨域（CORS）~~ ✅ Day 24 已解决（cbsite 走网关反射、GitHub Pages 走函数补位）；② token 的存放位置与过期处理（过期 = 回落到本地收藏，且提示一次）。
 
 ---
 
@@ -463,7 +463,7 @@
 | 主要代价 | 要**新注册**一个平台账号；RLS 规则要写对，写错 = 数据裸奔 | 已开通、能立刻开工；但函数数量多、三处排错（浏览器 + 函数日志 + 数据库） |
 
 **落地口径（B2）**：§3 的每个接口 = 一个**云函数**（第 0 个 `health` 已在 `cloudbase/functions/health/`）。本契约的路径与 JSON 形状两种形态都不用改 —— 换形态只换实现层，契约不动。
-**另需补**：RLS 策略（CloudBase PG 的 `public` schema 可被 PostgREST 直连，不配策略 = 权限不可控）+ HTTP 网关跨域设置。
+**另需补**：RLS 策略（CloudBase PG 的 `public` schema 可被 PostgREST 直连，不配策略 = 权限不可控）+ ~~HTTP 网关跨域设置~~ ✅ Day 24 已解决（cbsite 网关反射 / GitHub Pages 函数补位）。
 
 ---
 
@@ -471,6 +471,7 @@
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-10-12（Day 24 · 部署实测） | v0.6 | **跨域（CORS）闭环。** 背景：GitHub Pages 站上的前端检查台被浏览器 CORS 拦（`No 'Access-Control-Allow-Origin'`）；排查锁定 = 网关只对「本环境静态托管域名 / 本机地址」反射 CORS 头，GitHub Pages 域名从未在白名单。配置路被套餐封死：免费体验版**不允许自助添加「安全域名」**（MCP `addSecurityDomain` / CLI `tcb cors add` 均报 `[CreateAuthDomain] 当前套餐无法执行此操作`；教科书域名 `example.com` 对照同样被拒 → 排除格式因素）。修复（定案 · 函数侧补位）：`health` / `favorites` / `hot` 三函数在 `Origin === 'https://simple-superhero-678.github.io'` 时自回 `access-control-allow-origin`（精确来源、非通配），两个带 OPTIONS 的函数将该来源加入 `可信来源` set 放行预检。验证：五探针（github.io 有头 / cbsite 不变 / evil.com 仍拒）+ E1 六步全链路（含首次 201）+ 三道闸门（128/128 · 22/22 · 15/15）。⚠️ **善后条件**：将来若该域名加进「安全域名」白名单，必须删掉三处补位，否则「网关反射 + 函数自写」拼成双值非法头。详见 `cloudbase/README.md` Day 24 记录与 `tools/回归/Day24-核心流程测试清单.md` |
 | 2026-10-08（Day 18 · 部署实测） | v0.4 | **第一个写接口上线并通过公网验证**：§3.6 `POST /api/favorites` 标记已实现（与 `GET /api/favorites` 同一个云函数，按方法分流）。三条验证全部对上契约 —— 正常写入 `201` / 重复提交 `409 FAV_DUPLICATE` / 缺必填字段 `400` + 中文提示；数据库侧确认「写进去的读得出来」（`GET` 的 `total` 与表行数一致，重复请求不增行）。补记三处口径 —— ① §3.6 请求校验细则（空白 / 超 64 字 / 体非 JSON 一律 400，提示必须中文点名缺什么）；② §3.6 明确「防重复靠数据库唯一约束而非函数里的先查再插」；③ §1 临时认证口径由「Day 18 删」改为「**待 `POST /api/auth/session` 落地后删**」（Day 18 当天选择先做写接口，未做 auth）。§3 错误码补登 `405`。⚠️ **实测发现**：PG 网关口回的唯一冲突码是 `DATABASE_23505`（带前缀）而不是裸 `23505`，函数需归一化后再判，否则「重复收藏」会被当成 `500` 回给前端 —— 详细排错见 `cloudbase/README.md` |
 | 2026-10-11（Day 22 · 部署实测） | v0.5 | **写接口补齐全：PATCH + DELETE 上线，聚成「增删改查」四类操作闭环**（Day 17 GET / Day 18 POST / Day 22 PATCH·DELETE）。具体：① `public.favorites` 加 `remark` 列（可空、≤500 字，迁移 `20261011180000_add_remark`）；② `PATCH /api/favorites/{entry_id}` 局部改备注（只认 `remark` 字段，命中 0 行→404 中文）；③ `DELETE /api/favorites/{entry_id}` 落地契约 §3.7（命中 0 行→404 `FAV_NOT_FOUND`，幂等）；④ 路由支持 `/api/favorites/{entry_id}`（集合端点仅 GET/POST、单项端点仅 PATCH/DELETE，方法不对一律 405）；⑤ 前端 `store.js` 删除路径加二次确认；⑥ 三道闸门复跑：api-local-test 122/122、refactor-fingerprint 22/22 不变、online-regress 补 2 例。⚠️ **实测说明**：PostgREST 网关对新列 `remark` 的 schema 缓存 —— 本次迁移（`20261011180000_add_remark`）后即生效，线上 PATCH 直接成功，未触发「column remark does not exist」，无需手动刷缓存（若以后真遇到该错再走 `NOTIFY` 刷新，见 README 已知坑）。 |
 | 2026-10-07（Day 17 · 部署实测） | v0.3.1 | **两个读接口上线并通过公网验证**：`GET /api/favorites` / `GET /api/hot` 已挂到默认域名（HTTP 网关，上游类型 `WEB_SCF`）。**数据通路定案**：优先 CloudBase PG HTTP 网关 + 环境 API Key（`service_role`，仅服务端），`PG_URL` 配了则切回 `pg` 直连；§3.5 补记 `created_at` 归一化与 `total` 的两种取法。⚠️ 网关是 PostgREST 形态，**不支持 `GROUP BY`**，`/api/hot` 的聚合在函数内完成（契约 §3.11 记账）。实现与排错见 `cloudbase/README.md` |

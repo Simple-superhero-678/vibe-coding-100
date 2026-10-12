@@ -46,11 +46,20 @@ const PORT = process.env.PORT || 9000;
 const 默认条数 = 10;
 const 最大条数 = 50;
 
-// 可信来源（Day 20）：线上 CORS 由网关反射承担；这份白名单只用于 OPTIONS 分支的本机直连自测。
+// —— Day 24 补位来源：GitHub Pages 的 CORS 头由函数自己补 ——
+// 为什么：免费体验版套餐不允许自助添加「安全域名」（实测报 CreateAuthDomain 当前套餐无法执行此操作），
+//   网关不会给这个来源反射 CORS 头。函数按【精确来源】自己写一个（只认这一个 origin，不是 * 通配符）。
+// ⚠️ 善后条件：将来若把该域名加进「安全域名」白名单 —— 必须删掉这段补位（含 可信来源 里的它），
+//   否则「网关反射 + 函数自写」会拼成双值非法头（Day 20 踩过这个坑）。
+const 补位来源 = 'https://simple-superhero-678.github.io';
+
+// 可信来源（Day 20）：cbsite / 本机地址的 CORS 由网关反射承担；这份白名单供 OPTIONS 分支回显。
+// Day 24 起 补位来源 也在其中 —— github.io 的线上预检网关不接管，由函数回。
 const 可信来源 = new Set([
   'https://yishou-d9gyoykka49fb0634-1501173044.tcloudbaseapp.com',
   'http://localhost:8000',
   'http://127.0.0.1:8000',
+  补位来源,
 ]);
 
 /* ==========================================================================
@@ -106,13 +115,19 @@ function 造处理({ 查询者 }) {
       );
     });
 
+    // Day 24 补位：来自 GitHub Pages 的请求，网关不会反射 CORS 头 —— 函数自己补（精确来源，非通配）。
+    // 放在所有分支之前：成功 / 404 / 405 的响应都会带上它（setHeader 与 writeHead 自动合并）。
+    if (req.headers.origin === 补位来源) {
+      res.setHeader('access-control-allow-origin', 补位来源);
+    }
+
     const 路径 = (req.url || '/').split('?')[0].replace(/\/+$/, '') || '/';
 
     if (路径 !== '/' && !路径.endsWith('/api/hot')) {
       return 失败(res, 404, 'NOT_FOUND', `没有这个接口：${路径}`);
     }
     if (req.method === 'OPTIONS') {
-      // 预检（Day 20 收紧）：线上由网关整体接管；这里的白名单回显只服务本机直连自测。
+      // 预检（Day 20 收紧）：cbsite 的线上预检由网关整体接管；本机直连 + GitHub Pages（Day 24 补位）走这里的回显。
       const origin = req.headers.origin || '';
       const 头 = { 'access-control-allow-methods': 'GET,OPTIONS' };
       if (可信来源.has(origin)) {

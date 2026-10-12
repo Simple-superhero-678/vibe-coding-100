@@ -1,0 +1,7 @@
+{
+  "name": "yishou-health",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GET /api/health 存活探针（不连库）（CloudBase Web 函数）",
+  "dependencies": {}
+}

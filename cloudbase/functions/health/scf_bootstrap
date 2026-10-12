@@ -1,0 +1,5 @@
+#!/bin/bash
+# CloudBase Web 函数（HTTP 云函数）启动脚本
+# 平台约定：函数容器启动时执行本文件，进程需监听 9000 端口
+export PORT=9000
+exec node index.web.js

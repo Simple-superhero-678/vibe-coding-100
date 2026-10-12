@@ -19,7 +19,7 @@
 
 | 函数名 | 路由 | 认证 | 读什么 | 说明 |
 |---|---|---|---|---|
-| `health` | `GET /api/health` | 否 | 不连库 | 存活探针，只回 `{"ok":true,"service":"yishou"}`（Day 15） |
+| `health` | `GET /api/health` | 否 | 不连库 | 存活探针，只回 `{"ok":true,"service":"yishou"}`（Day 15）· Day 24 起补齐 `scf_bootstrap`/`package.json`（可 CLI 部署） |
 | `favorites` | `GET` + `POST` + `PATCH` + `DELETE` `/api/favorites` | 是（临时 `user_id`） | `public.favorites` | **读** GET（Day 17）· **写** POST 新增（Day 18）· **改** PATCH 局部改备注（Day 22，路径 `/api/favorites/{entry_id}`，只认 `remark`）· **删** DELETE 取消收藏（Day 22） |
 | `hot` | `GET /api/hot` | 否 | `public.favorites` 聚合 | 「收藏热门榜」：被收藏最多的条目 Top N（Day 17，口径见下） |
 
@@ -340,6 +340,29 @@ WHERE user_id='11111111-1111-4111-8111-111111111111' AND entry_id='<本次测试
 根因 = CloudBase HTTP 网关把路由前缀剥掉后**只转发相对路径**（`/` 或 `/{id}`），而 `favorites` 路由代码只认完整路径 `/api/favorites…`。
 `health` 函数早就写了「完整路径 / 剥前缀两种都放行」的兼容写法（`cloudbase/functions/health/index.web.js`），`favorites` 这次补齐 —— 见下方「已知坑」。
 
+## 验证记录（Day 24 · GitHub Pages 检查台被跨域拦 → 函数侧补位 · 2026-10-12）
+
+**现象**：GitHub Pages 站（`https://simple-superhero-678.github.io/vibe-coding-100/`）上「后端检查台」两格红字，Console 报 `has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header...`；同一份代码在 cbsite 站一切正常。
+
+**定位（排除法）**：同代码换域名即好（排除代码）/ curl 直打 200（排除接口与库）/ 全新档案仍复现（排除缓存）→ 响应头三来源对照锁定：网关只对「本环境静态托管域名 + 本机地址」反射 CORS 头，且预检（OPTIONS）一好一坏（cbsite 被网关直接接管、github.io 被透传给函数无人放行）。完整排除表见 `tools/回归/Day24-核心流程测试清单.md` §七。
+
+**为什么没走配置**：见下方「已知坑」免费体验版条目（三证：MCP / CLI / 对照实验）。
+
+**修复（函数侧补位）**：`health` / `favorites` / `hot` 各加一段 —— `Origin === 'https://simple-superhero-678.github.io'` 时函数自回 `access-control-allow-origin`（**精确来源，非通配**）；`favorites` / `hot` 同步把该来源加进 `可信来源`（OPTIONS 预检放行 `content-type`）。机制依据：Day 20 已知「函数写的 CORS 头会透出（与网关反射是拼接而非被剥）」+ 网关对该来源不反射 → 单值合法头直达浏览器。
+
+**验证（全绿）**：
+
+| 项目 | 结果 |
+|---|---|
+| github.io GET health / favorites | 200 + `access-control-allow-origin: https://simple-superhero-678.github.io` |
+| github.io OPTIONS 预检 | 204 + ACAO + `allow-headers: authorization,content-type` + `allow-methods` 含 POST |
+| cbsite 回归 | 网关反射照旧、无重复头 |
+| evil.com（安全对照） | 仍无任何 ACAO |
+| E1 六步全链路 | 读 18 行 → 写 **201** → 19 行 → 刷新仍 19 → 改 200 → 删 200/404 → 回落 18 |
+| 三道闸门 | api-local-test **128/128** · refactor-fingerprint **22/22** · online-regress **15/15** |
+
+> 📌 `health` 函数此前缺 `scf_bootstrap` / `package.json`（Day 15 控制台模板时代部署），Day 24 一并补齐 —— 三个函数从今天起都能用同一套 `tcb fn deploy` 流程。
+
 ## 备选部署路径（控制台 · Web 函数）
 
 控制台路径同样可行，代码一字不用改：**创建云函数 → 模板 HTTP 云函数 → Node.js Hello World** →
@@ -401,3 +424,8 @@ WHERE user_id='11111111-1111-4111-8111-111111111111' AND entry_id='<本次测试
 - ⚠️ 两个函数都做「前缀是否被剥掉」的兜底，所以各自只会处理自己的路径；`favorites` 收到 `/api/hot` 会回 404（本机自测里有这条）。
 - ⚠️ `updateFunctionConfig` 下发环境变量后**不需要重新部署代码**，配置变更即时生效；但**改了 `index.web.js` 就必须重新 deploy**。
 - 🔴 **Day 22 真坑（已修）：CloudBase HTTP 网关转发给函数的是「剥掉路由前缀后的相对路径」** —— `/api/favorites` 进函数变成 `/`、`/api/favorites/{id}` 变成 `/{id}`，**不是**完整路径。函数路由代码必须像 `health` 那样兼容两种形态（完整 `/api/favorites…` 与相对 `/` `/{id}`），否则部署后所有路径 404「没有这个接口：/」。`favorites` 这次已补齐双兼容；排查时先看函数日志里 `req.url` 到底收到什么。
+- 🔴 **免费体验版不能添加「安全域名」（浏览器 CORS 白名单）。（Day 24 实测）**
+  症状：第三方域名（如 GitHub Pages）的页面调接口，浏览器报 `No 'Access-Control-Allow-Origin'` —— 因为网关只给「本环境静态托管域名 + 本机地址」反射 CORS 头。
+  试过：MCP `addSecurityDomain`、CLI `tcb cors add` → 均报 `[CreateAuthDomain] 当前套餐无法执行此操作`；再用教科书域名 `example.com` 对照 → **同样被拒**（排除格式问题；CLI 提示的 "check domain format" 是误导）。官方答复（tencent/cloudbase issue #1320）：个人版免费档不允许自定义 Web 安全域名，控制台大概率同样被拦。
+  对策：函数侧按【精确来源】补 CORS 头（`health`/`favorites`/`hot` 三个函数各有一段「补位来源」；不是通配符）。
+  ⚠️ 善后：将来若把该域名加进「安全域名」白名单，**必须删掉三处补位**，否则「网关反射 + 函数自写」拼成双值非法头（Day 20 踩过）。

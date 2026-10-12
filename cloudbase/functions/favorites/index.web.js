@@ -56,12 +56,22 @@ const 最大条数 = 500;
 // 只认 uuid 形态的 user_id（表里 user_id 是 uuid 列，格式不对不用去问数据库）
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// 可信来源（Day 20）：线上 CORS 由网关反射承担；这份白名单只用于 OPTIONS 分支的本机直连自测。
+// —— Day 24 补位来源：GitHub Pages 的 CORS 头由函数自己补 ——
+// 为什么：免费体验版套餐不允许自助添加「安全域名」（MCP / CLI 实测均报
+//   [CreateAuthDomain] 当前套餐无法执行此操作；连对照域名 example.com 也被拒 —— 是套餐限制，不是格式问题），
+//   网关因此不会给这个来源反射 CORS 头。函数按【精确来源】自己写一个（只认这一个 origin，不是 * 通配符）。
+// ⚠️ 善后条件：将来若套餐升级、把该域名加进「安全域名」白名单 —— 必须删掉这段补位（含 可信来源 里的它），
+//   否则「网关反射 + 函数自写」会拼成双值非法头，浏览器直接拒收（Day 20 踩过这个坑）。
+const 补位来源 = 'https://simple-superhero-678.github.io';
+
+// 可信来源（Day 20）：cbsite / 本机地址的 CORS 由网关反射承担；这份白名单供 OPTIONS 分支回显。
+// Day 24 起 补位来源 也在其中 —— github.io 的线上预检网关不接管，由函数回（见下）。
 // 与网关实测口径对齐：自己的静态托管域名 + 本机调试地址；不用 * 通配符。
 const 可信来源 = new Set([
   'https://yishou-d9gyoykka49fb0634-1501173044.tcloudbaseapp.com',
   'http://localhost:8000',
   'http://127.0.0.1:8000',
+  补位来源,
 ]);
 
 /* ==========================================================================
@@ -377,6 +387,12 @@ function 造处理({ 查询者 }) {
       );
     });
 
+    // Day 24 补位：来自 GitHub Pages 的请求，网关不会反射 CORS 头 —— 函数自己补（精确来源，非通配）。
+    // 放在所有分支之前：成功 / 校验失败 / 405 / 404 的响应都会带上它（setHeader 与 writeHead 自动合并）。
+    if (req.headers.origin === 补位来源) {
+      res.setHeader('access-control-allow-origin', 补位来源);
+    }
+
     const 路径 = (req.url || '/').split('?')[0].replace(/\/+$/, '') || '/';
     const 前缀 = '/api/favorites';
 
@@ -406,8 +422,8 @@ function 造处理({ 查询者 }) {
     }
 
     if (req.method === 'OPTIONS') {
-      // 预检（Day 20 收紧）：线上由网关整体接管（实测函数写的头会被替换成按请求反射的值）。
-      // 这里的白名单回显只服务本机直连自测 —— 可信来源才回 CORS 头，不给通配符。
+      // 预检（Day 20 收紧）：cbsite 的线上预检由网关整体接管；本机直连 + GitHub Pages（Day 24 补位）
+      // 走这里的白名单回显 —— 可信来源才回 CORS 头，不给通配符。
       const origin = req.headers.origin || '';
       // 集合端点与单项端点都放行；PATCH/DELETE 是今天新上的方法
       const 头 = { 'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS' };

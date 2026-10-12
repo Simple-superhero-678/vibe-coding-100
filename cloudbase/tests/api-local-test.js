@@ -135,7 +135,7 @@ async function 取(基址, 路径, 选项) {
   } catch (e) {
     /* 204 之类没有体 */
   }
-  return { 状态: r.status, 体 };
+  return { 状态: r.status, 体, 头: r.headers }; // 头：Day 24 起断言 CORS 响应头要用
 }
 
 // POST 用：把请求体塞进去，其余交给 取()。
@@ -491,6 +491,48 @@ let 全局原fetch;
     断言('DELETE 4/ 无身份 → 401', r.状态 === 401 && r.体.error.code === 'UNAUTHORIZED', JSON.stringify(r.体));
   }
 
+  /* ============ 一之四、Day 24：GitHub Pages「补位 CORS」（免费版无安全域名 → 函数自补） ============ */
+
+  {
+    // 背景：GitHub Pages 域名进不了「安全域名」白名单（免费体验版套餐限制），
+    // 网关不为它反射 CORS 头 —— 函数按精确来源自己补。这里验四件事：
+    //   ① 简单 GET 带 ACAO 且值=该来源 ② OPTIONS 预检三件套齐 ③ 陌生来源仍无头 ④ POST 也带
+    const 补位 = 'https://simple-superhero-678.github.io';
+
+    const 读 = await 取(a.基址, `/api/favorites?user_id=${用户1}`, { headers: { Origin: 补位 } });
+    断言(
+      '补位 1/ github.io 的 GET 响应带 ACAO，且值 = 该来源（不是通配）',
+      读.状态 === 200 && 读.头.get('access-control-allow-origin') === 补位,
+      `${读.状态} ACAO=${读.头.get('access-control-allow-origin')}`
+    );
+
+    const 预检 = await 取(a.基址, `/api/favorites?user_id=${用户1}`, {
+      method: 'OPTIONS',
+      headers: { Origin: 补位, 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type' },
+    });
+    const 预检头 = 预检.头.get('access-control-allow-headers') || '';
+    const 预检法 = 预检.头.get('access-control-allow-methods') || '';
+    断言(
+      '补位 2/ github.io 的 OPTIONS 预检：204 + ACAO + 放行 content-type + 放行 POST',
+      预检.状态 === 204 && 预检.头.get('access-control-allow-origin') === 补位 && /content-type/i.test(预检头) && /POST/.test(预检法),
+      `${预检.状态} ACAO=${预检.头.get('access-control-allow-origin')} headers=${预检头} methods=${预检法}`
+    );
+
+    const 陌生 = await 取(a.基址, `/api/favorites?user_id=${用户1}`, { headers: { Origin: 'https://evil.com' } });
+    断言(
+      '补位 3/ 陌生来源（evil.com）依旧无 ACAO —— 补位不是通配',
+      陌生.状态 === 200 && !陌生.头.get('access-control-allow-origin'),
+      `ACAO=${陌生.头.get('access-control-allow-origin')}`
+    );
+
+    const 写 = await 发文(a.基址, `/api/favorites?user_id=${用户1}`, { entry_id: 'yishou-day24' }, { Origin: 补位 });
+    断言(
+      '补位 4/ github.io 的 POST 响应也带 ACAO（201/409 都算写通路通）',
+      (写.状态 === 201 || 写.状态 === 409) && 写.头.get('access-control-allow-origin') === 补位,
+      `${写.状态} ACAO=${写.头.get('access-control-allow-origin')}`
+    );
+  }
+
   a.服务.close();
 
   /* ============ 二、hot 纯逻辑 ============ */
@@ -536,6 +578,30 @@ let 全局原fetch;
   {
     const r = await 取(c.基址, '/api/hot');
     断言('hot 14/ 不带任何身份也 200（公开聚合，无个人信息）', r.状态 === 200 && r.体.ok === true, JSON.stringify(r.体));
+  }
+
+  /* ============ 二之二、Day 24：hot 的「补位 CORS」 ============ */
+
+  {
+    // 同 favorites 补位（见「一之四」）：github.io 的 CORS 头由函数补、陌生来源仍然无头。
+    const 补位 = 'https://simple-superhero-678.github.io';
+
+    const 读 = await 取(c.基址, '/api/hot', { headers: { Origin: 补位 } });
+    断言(
+      '补位 5/ hot 的 GET 响应带 ACAO，且值 = 该来源',
+      读.状态 === 200 && 读.头.get('access-control-allow-origin') === 补位,
+      `${读.状态} ACAO=${读.头.get('access-control-allow-origin')}`
+    );
+
+    const 预检 = await 取(c.基址, '/api/hot', {
+      method: 'OPTIONS',
+      headers: { Origin: 补位, 'access-control-request-method': 'GET' },
+    });
+    断言(
+      '补位 6/ hot 的 OPTIONS 预检带 ACAO',
+      预检.状态 === 204 && 预检.头.get('access-control-allow-origin') === 补位,
+      `${预检.状态} ACAO=${预检.头.get('access-control-allow-origin')}`
+    );
   }
 
   c.服务.close();
