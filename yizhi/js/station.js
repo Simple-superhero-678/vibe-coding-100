@@ -57,10 +57,34 @@ function 落内容(格, 点类, 文本) {
   格.replaceChildren(题, 建点(点类), 文);
 }
 
+/* —— 三类错误的统一出口（Day 23）——
+   不管错从哪来（输入错 / 网络错 / 服务端错），上屏之前都先过这里翻成人话。
+   三条规矩，按优先级：
+     ① 服务端已经给了中文 message（后端文案更具体，如「entry_id 最长 64 个字符，收到 65 个」）→ 原样用；
+     ② 只有英文 / 空 → 按 code 查表翻；
+     ③ 表里也没有 → 给通用兜底。
+   结果：**任何情况下都不会把 undefined、英文原文、数据库报错糊到用户脸上**。
+   （为什么按 code 记：code 是 api-contract.md §1 里的稳定字段，文案以后会改，code 不会。） */
+const 错误人话 = {
+  NETWORK: '连不上接口——检查网络，或稍后再试（服务可能没起来）',
+  BAD_JSON: '接口回了看不懂的内容（不是 JSON），多半是服务端的问题',
+  BAD_REQUEST: '请求有问题',
+  UNAUTHORIZED: '需要先登录（或带上身份）',
+  FAV_DUPLICATE: '这条已经在收藏里了',
+  FAV_NOT_FOUND: '找不到这条收藏',
+  INTERNAL: '服务端暂时处理不了，请稍后重试',
+};
+export function 中文错误(因) {
+  const 码 = (因 && 因.code) || '';
+  const 原话 = (因 && 因.message) || '';
+  if (/[\u4e00-\u9fa5]/.test(原话)) return 原话;
+  return 错误人话[码] || `出错了，请稍后重试（${码 || '未知错误'}）`;
+}
+
 function 落错(格, 因) {
   const 题 = 格.querySelector('.station-cell-t');
   const 文 = document.createElement('span');
-  文.textContent = `读不到：${因.message}`;
+  文.textContent = `读不到：${中文错误(因)}`;
   const 重试 = document.createElement('button');
   重试.type = 'button';
   重试.className = 'station-retry';
@@ -114,7 +138,7 @@ async function 写入测试(格, 钮) {
     if (因.code === 重复码) {
       记.textContent = '409 · 接口拦下了重复写入（唯一约束在工作，没有堆垃圾行）';
     } else {
-      记.textContent = `写入失败：${因.message}`;
+      记.textContent = `写入失败：${中文错误(因)}`;
     }
   } finally {
     钮.removeAttribute('aria-disabled');

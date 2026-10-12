@@ -365,6 +365,18 @@ function 造处理({ 查询者 }) {
   }
 
   return async function 处理(req, res) {
+    // 请求日志（Day 23 余力）：一行记下「什么时候、什么方法、打了哪条路径、结果如何」。
+    // 挂在 res 的 finish 事件上 —— 不管从哪条分支返回（成功 / 校验失败 / 405 / 404）都会记一笔，
+    // 而且**不碰任何业务逻辑**（不包装 res、不拦截返回值）。
+    // 路径只留 path、丢掉 ?query：免得以后 query 里出现敏感参数被原样写进日志。
+    const 起 = Date.now();
+    res.on('finish', () => {
+      const 净路径 = (req.url || '/').split('?')[0];
+      console.log(
+        `[favorites] ${new Date().toISOString()} ${req.method} ${净路径} → ${res.statusCode}（${Date.now() - 起}ms）`
+      );
+    });
+
     const 路径 = (req.url || '/').split('?')[0].replace(/\/+$/, '') || '/';
     const 前缀 = '/api/favorites';
 

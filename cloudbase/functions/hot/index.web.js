@@ -95,6 +95,17 @@ function 算榜单(行, limit) {
 
 function 造处理({ 查询者 }) {
   return async function 处理(req, res) {
+    // 请求日志（Day 23 余力）：一行记下「什么时候、什么方法、打了哪条路径、结果如何」。
+    // 挂在 res 的 finish 事件上 —— 任何分支返回都会记一笔，且不碰业务逻辑。
+    // 路径只留 path、丢掉 ?query（理由同 favorites：防敏感参数进日志）。
+    const 起 = Date.now();
+    res.on('finish', () => {
+      const 净路径 = (req.url || '/').split('?')[0];
+      console.log(
+        `[hot] ${new Date().toISOString()} ${req.method} ${净路径} → ${res.statusCode}（${Date.now() - 起}ms）`
+      );
+    });
+
     const 路径 = (req.url || '/').split('?')[0].replace(/\/+$/, '') || '/';
 
     if (路径 !== '/' && !路径.endsWith('/api/hot')) {
