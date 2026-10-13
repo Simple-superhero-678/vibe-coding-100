@@ -159,12 +159,6 @@ body{
   font-family:var(--serif);
   font-size:12px;letter-spacing:.22em;color:var(--ink-2);
 }
-/* 版本标记（Day 26 追加）：书尾记版本 —— 正式发布与回滚演练的肉眼抓手。
-   比正行小一档、沿用淡墨，不引入新的强调色与重量。 */
-.colophon-ver{
-  margin-left:.7em;
-  font-size:11px;letter-spacing:.08em;
-}
 /* 牌记印（09-22 追加）：书尾收束用。三字竖排，38px 见方 —— 比卡片角标大、比卷首闲章小。 */
 .colophon-seal{
   width:38px;height:38px;
