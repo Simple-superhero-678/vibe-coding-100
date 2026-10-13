@@ -190,3 +190,27 @@ vibe coding打卡学习/          ← 仓库根
 改完刷新页面即可，**没有构建步骤**。
 
 > 唯一的判定口径：每条内容都要能回答「**写小说时我怎么用**」。写不出来，就不该进站。
+
+---
+
+## 五、发布前检查（verify-project）
+
+发布（推 GitHub / 手动传站）或改完数据、代码之后跑一遍——**一条命令 10 项，逐项 PASS/FAIL + 证据**，坏东西别出门。Day 25 建，细则与边界见 `.workbuddy/skills/verify-project/SKILL.md`。
+
+```bash
+# 在仓库根跑（脚本自己会认仓库根，在哪跑都行）
+python .workbuddy/skills/verify-project/scripts/run-check.py
+
+python .workbuddy/skills/verify-project/scripts/run-check.py --演练       # 自证「不虚报通过」
+python .workbuddy/skills/verify-project/scripts/run-check.py --标签 演示   # 记录文件加后缀（同日多次跑不互相覆盖）
+```
+
+| 组 | 查什么 | 通过标准 |
+|---|---|---|
+| 甲 · 安全红线 | 密钥扫描（自带阳性对照）/ 敏感路径忽略 / 站点目录卫生 | 密钥 0 条 · 忽略 5/5 · 过程文件 0 个 |
+| 乙 · 线上活着 | Pages 站 / 接口 health / CORS 防线双探针 | 全 200 · github.io 来源有 ACAO、evil 来源无 |
+| 丙 · 本地发布物 | 五部 96 条数据 / JS 语法 / 引用无悬空 / 发布内容预演 | 逐项全对（预演 = CI 同款排除规则 + 白名单核对） |
+
+- **退出码**：`0` = 全绿「可以发布」｜`1` = 有失败（逐条列证据）｜`2` = 脚本自身问题。
+- **记录**：`tools/自检记录/YYYY-MM-DD-发布前检查.json`（同日重跑会覆盖，用 `--标签` 区分）。
+- **`--演练` 是什么**：往 `station.js` 真注入一行假密钥 → 检查必须变红 → 自动恢复（字节级校验）→ 复跑必须变绿。用来证明这个检查「脏了会红、干净才绿」，不会虚报通过。
