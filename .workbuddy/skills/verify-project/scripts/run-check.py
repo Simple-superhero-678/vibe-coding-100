@@ -49,7 +49,7 @@ def 找仓库根():
 来源_evil = 'https://evil.example.com'
 
 五部期望 = [('shenxian.json', '神仙部', 30), ('shenhua.json', '神话部', 20),
-           ('yishou.json', '异兽部', 12), ('yaoguai.json', '妖怪部', 20),
+           ('yishou.json', '异兽部', 13), ('yaoguai.json', '妖怪部', 20),
            ('jingjie.json', '境界部', 14)]
 
 发布白名单后缀 = {'.html', '.css', '.js', '.json', '.webp', '.gitkeep'}
@@ -312,7 +312,7 @@ def 检查_C2():
 
 
 def 检查_C3():
-    """引用无悬空 —— html 引的 / js 导入的 / 数据文件 / 12 张图双向对齐"""
+    """引用无悬空 —— html 引的 / js 导入的 / 数据文件 / 配图双向对齐"""
     悬空 = []
     计数 = {'html': 0, 'js': 0, 'data': 0, '图': 0}
     页 = os.path.join(仓库根, 'yizhi', 'index.html')

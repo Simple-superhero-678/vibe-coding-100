@@ -12,7 +12,7 @@
    固定跑一条链路，不用 URL 参数：
      预置 2 条收藏（异兽·九尾狐 + 妖怪·蜘蛛精）
      → 进 #/藏（面板开、2 条）
-     → 取消九尾狐那一条（列表 1 条、计数 1、存储 1）
+     → 取消九尾狐那一条（**过二次确认弹层，点「确定移除」**）（列表 1 条、计数 1、存储 1）
      → 关面板（地址收回 #/部/异兽）
      → 点网格第一张卡开详情（地址变 #/条/yishou-001）
      → 详情里点「收藏」（计数回到 2、存储 2）
@@ -25,9 +25,13 @@
    ⚠️ 必须带 --force-prefers-reduced-motion 跑（flow-check.py 已加）：
       否则点卡片先播 3 秒云中仙槎转场，探针会抢在详情挂载之前读 DOM。
    ⚠️ 等待一律按迭代次数让出，不用 Date.now() 计时。
+   ⚠️ 每步实时刷 data-result（2026-10-13 加）：探针卡住时，dump 里也能看见停在哪个「→」。
+   ⚠️ 2026-10-13 修复：Day 22 起「取消收藏」前有二次确认弹层（.confirm-dialog），
+      探针须显式点「确定移除」；此档自 Day 22 起就没跟上产品变更，今天补上。
 */
 (async () => {
   const 记 = [];
+  const 刷 = () => { try { document.body.setAttribute('data-result', 记.join(' ;; ')); } catch (e) {} };
   const 让出 = async (次) => {
     for (let i = 0; i < 次; i++) await new Promise(r => setTimeout(r, 16));
   };
@@ -60,54 +64,67 @@
   const 详情开 = () => !!取文().querySelector('dialog.detail[open]');
 
   try {
+    记.push('→0:预置+建iframe'); 刷();
     localStorage.setItem('yishou.fav.v1', JSON.stringify(['yishou-001', 'yaoguai-003']));
     框.src = 'index.html#/藏';
     document.getElementById('框').append(框);
 
     // ① 进收藏夹：面板开 + 2 条
+    记.push('→①等:面板开且2条'); 刷();
     await 等到(() => 面板开() && 条数() === 2);
     await 让出(20);
-    记.push('A=进藏后条数:' + 条数());
+    记.push('A=进藏后条数:' + 条数()); 刷();
 
-    // ② 取消九尾狐（网格第一张卡就是它）
+    // ② 取消九尾狐（网格第一张卡就是它）→ 过二次确认弹层（Day 22 起）
+    记.push('→②点「取消收藏」'); 刷();
     取文().querySelector('.fav-item[data-id="yishou-001"] .fav-remove').click();
+    记.push('→②等:确认弹层出现'); 刷();
+    await 等到(() => 取文().querySelector('.confirm-dialog .confirm-ok'));
+    await 让出(5);
+    const 确定 = 取文().querySelector('.confirm-dialog .confirm-ok');
+    if (确定) 确定.click();
+    记.push('→②等:条数变1'); 刷();
     await 等到(() => 条数() === 1);
     await 让出(20);
-    记.push('B=取消后条数:' + 条数());
-    记.push('C=取消后计数:' + 计数());
-    记.push('D=取消后存储:' + 存储数());
+    记.push('B=取消后条数:' + 条数()); 刷();
+    记.push('C=取消后计数:' + 计数()); 刷();
+    记.push('D=取消后存储:' + 存储数()); 刷();
 
     // ③ 关收藏面板 → 地址收回部浏览
+    记.push('→③关面板'); 刷();
     取文().getElementById('关收藏').click();
     await 等到(() => !面板开());
     await 让出(20);
-    记.push('E=关面板后地址:' + 址());
-    记.push('F=关面板后面板开:' + 面板开());
+    记.push('E=关面板后地址:' + 址()); 刷();
+    记.push('F=关面板后面板开:' + 面板开()); 刷();
 
     // ④ 点网格第一张卡 → 开详情（地址应变深链）
+    记.push('→④点第一张卡'); 刷();
     取文().querySelector('#视图台 [data-id]').click();
     await 等到(() => 详情开());
     await 让出(20);
-    记.push('G=详情地址:' + 址());
+    记.push('G=详情地址:' + 址()); 刷();
 
-    // ⑤ 详情里点「收藏」→ 计数回到 2
+    // ⑤ 详情里点「收藏」→ 计数回到 2（加收藏无二次确认）
+    记.push('→⑤详情点收藏'); 刷();
     取文().querySelector('dialog.detail .act-fav').click();
     await 等到(() => 计数() === '2');
     await 让出(20);
-    记.push('H=详情收藏后计数:' + 计数());
-    记.push('K=详情收藏后存储:' + 存储数());
+    记.push('H=详情收藏后计数:' + 计数()); 刷();
+    记.push('K=详情收藏后存储:' + 存储数()); 刷();
 
     // ⑥ 点「收起」→ 详情关 + 地址收回
+    记.push('→⑥收起详情'); 刷();
     取文().querySelector('dialog.detail .act-close').click();
     await 等到(() => !详情开());
     await 让出(20);
-    记.push('I=收详情后地址:' + 址());
-    记.push('J=收详情后详情开:' + 详情开());
+    记.push('I=收详情后地址:' + 址()); 刷();
+    记.push('J=收详情后详情开:' + 详情开()); 刷();
   } catch (因) {
     记.push('探针出错=' + String((因 && 因.message) || 因));
   }
 
-  document.body.setAttribute('data-result', 记.join(' ;; '));
+  刷();
 })();
 </script>
 </body>
