@@ -58,6 +58,16 @@ export async function 取收藏表(条数 = 3) {
   return 打(`/api/favorites?user_id=${展示用户}&limit=${条数}`);
 }
 
+/**
+ * 读某用户全部收藏的 entry_id（升序，旧在前）。给 store.js 云端同步用 ——
+ * 与 取收藏表 同源，但取全量 id（limit 上限 500，本表远不到）。
+ * @returns {Promise<string[]>}
+ */
+export async function 取收藏id() {
+  const 数据 = await 打(`/api/favorites?user_id=${展示用户}&limit=500`);
+  return (数据.items || []).map(项 => 项.entry_id);
+}
+
 /** 写入测试：POST /api/favorites —— 201 新增成功；409 = 接口把重复写入拦住了（同样是接口在真实工作） */
 export async function 写收藏表(条目id) {
   return 打(`/api/favorites?user_id=${展示用户}`, {
@@ -65,6 +75,19 @@ export async function 写收藏表(条目id) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ entry_id: 条目id }),
   });
+}
+
+/** 取消一条收藏：DELETE /api/favorites/{entry_id} —— 404 幂等（静默当成功） */
+export async function 删收藏表(条目id) {
+  try {
+    return await 打(`/api/favorites/${encodeURIComponent(条目id)}?user_id=${展示用户}`, {
+      method: 'DELETE',
+    });
+  } catch (错) {
+    // 404（已不存在）＝幂等成功，其余错误照常抛出
+    if (错 && 错.code === 'FAV_NOT_FOUND') return { ok: true };
+    throw 错;
+  }
 }
 
 /** 409 的错误码常量：station.js 要靠它区分「写进去了」和「被唯一约束拦住」 */

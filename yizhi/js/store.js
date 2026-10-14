@@ -10,11 +10,20 @@
 //   下载txt(文本)      → void
 //
 // 分层目的（TECH_DESIGN §12.5）：视图层不认识「收藏存在哪」。
-// 将来若加后端，只改这个文件（改成读写服务端），views/* 一行不动。
+// 加后端只改这个文件，views/* 与装配层（main.js）一行不动。
+//
+// Day 28 起接入后端（方案 A · 最小打通）：
+//   收藏的真源从 localStorage 迁到 CloudBase `public.favorites` 表。
+//   对外接口仍全部同步（list/has/toggle/remove），内部维护一份内存缓存：
+//     启动时 同步云端() 从云端拉全量 id 进缓存；toggle/remove 先改缓存、再异步写云端。
+//   localStorage 退为「离线/接口挂了」的降级读源，不再作为唯一真源。
+//   ⚠️ 临时口径：身份沿用 Day 17 的 `?user_id=<uuid>`（展示用户），真 token 落地后换成登录用户。
 //
 // 为什么 key 要带版本号（§12.3）：将来收藏的数据结构变了 → 起 yishou.fav.v2，
 // 旧 key 原样留着，读的时候合并或提示一次；不要原地改结构试运气。
 // 这个 key 只在本文件出现一次，要改只改这一处。
+
+import { 取收藏id, 写收藏表, 删收藏表 } from './api.js';
 
 export const KEY = 'yishou.fav.v1';
 
@@ -24,6 +33,13 @@ export const KEY = 'yishou.fav.v1';
    降级目标：内存态（本次会话有效），浏览功能一律不受影响，只在控制台留一句。 */
 const 内存兜底 = new Set();
 let 用兜底 = false;
+
+/* 云端缓存：list()/has() 的同步真源。启动时 同步云端() 填一次。 */
+let 内存ids = null;
+/* 云端是否在线（上次同步成功与否）。在线时读缓存、写云端；离线时回落 localStorage。 */
+let 云端在线 = false;
+/* 是否已经发起过首次同步（避免并发重复拉） */
+let 同步承诺 = null;
 
 /* 探测一次：能写能读能删，才算可用。只 try 一次 setItem 不够 ——
    Safari 老版本的隐私模式 setItem 抛异常，而有的环境 setItem 静默失败、getItem 返回 null。 */
@@ -91,44 +107,79 @@ function 写原始(ids) {
   }
 }
 
-/** 收藏的 id 列表（按收藏时间先后，旧的在前面） */
+/* 从云端拉全量 id，填进内存缓存；成功则把云端态置为在线，并把云端结果也写进
+   localStorage（让离线时能读到最近一次云端的样子）。 */
+export async function 同步云端() {
+  if (同步承诺) return 同步承诺;
+  同步承诺 = (async () => {
+    try {
+      const ids = await 取收藏id();
+      内存ids = ids;
+      云端在线 = true;
+      写原始(ids);           // 镜像一份到本地，作离线降级
+      console.info(`[store] 收藏已从云端同步：${ids.length} 条`);
+    } catch (因) {
+      云端在线 = false;
+      console.warn('[store] 云端同步失败，收藏回落本地：', 因);
+    } finally {
+      同步承诺 = null;
+    }
+  })();
+  return 同步承诺;
+}
+
+/** 收藏的 id 列表（按收藏时间先后，旧的在前面）。
+    云端已同步时读内存缓存；否则读 localStorage（含「接口还没回来」的启动瞬间）。 */
 export function list() {
+  if (内存ids) return [...内存ids];
   return 读原始();
 }
 
 export function has(id) {
-  return 读原始().includes(id);
+  return list().includes(id);
 }
 
 /**
- * 切换收藏。
+ * 切换收藏。先改内存缓存（同步、立即生效），再后台异步写云端 ——
+ * 云端写失败不打断 UI（缓存已反映用户意图，接口稍后/下次会再对齐）。
  * @returns {boolean} 切换后的状态：true = 现在已收藏
- * @throws 存储写失败时抛异常（调用方据此提示「没存上」，不假装成功）
+ * @throws 本地写失败时抛异常（调用方据此提示「没存上」，不假装成功）
  */
 export function toggle(id) {
-  const ids = 读原始();
+  const ids = list();
   const 在里 = ids.includes(id);
   const 新的 = 在里 ? ids.filter(项 => 项 !== id) : [...ids, id];
 
   try {
     写原始(新的);
+    内存ids = 新的;
   } catch (因) {
     console.error('[store] 写入异常：', 因);
     throw 因;
   }
 
+  /* 后台写云端：加收藏走 POST，取消走 DELETE。结果只影响「下次同步」的底，不打断当前 UI。 */
+  (在里 ? 删收藏表(id) : 写收藏表(id)).catch(因 => {
+    console.warn('[store] 云端写入失败（本地已更新，下次同步会对齐）：', 因);
+  });
+
   return !在里;
 }
 
 export function remove(id) {
-  const ids = 读原始();
+  const ids = list();
   if (!ids.includes(id)) return;
+  const 新的 = ids.filter(项 => 项 !== id);
   try {
-    写原始(ids.filter(项 => 项 !== id));
+    写原始(新的);
+    内存ids = 新的;
   } catch (因) {
     console.error('[store] 取消失败：', 因);
     throw 因;
   }
+  删收藏表(id).catch(因 => {
+    console.warn('[store] 云端删除失败（本地已更新）：', 因);
+  });
 }
 
 /* —— 导出 ——
